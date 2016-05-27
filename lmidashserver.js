@@ -128,6 +128,9 @@ app.get('/monitor.html', function(req, res){
 app.get('/monitor.js', function(req, res){
 	res.sendFile(__dirname + '/monitor.js');
 });
+app.get('/google82ada2049e314439.html', function(req, res){
+	res.sendFile(__dirname + '/google82ada2049e314439.html');
+});
 
 //********************************* Global class exceptions
 var Exception = function() {
