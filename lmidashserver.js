@@ -44,8 +44,9 @@ const options = {
 //    cert: fs.readFileSync('boldchat.crt')
 };
 
-var PORT = Number(1443);
-var server = https.createServer(options, app).listen(PORT);
+var PORT = Number(process.env.PORT || 1443);
+//var server = https.createServer(options, app).listen(PORT);
+var server = http.createServer(app).listen(PORT);
 var	io = require('socket.io').listen(server);
 
 //******* Get BoldChat API Credentials
