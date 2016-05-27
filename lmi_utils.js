@@ -259,64 +259,46 @@ function prepareDownloadFile(data)
 	$('#download').show(300);
 }
 
-function showLoginForm() {
-str = '<div class="form-horizontal col-xs-9 col-xs-offset-3">' +
-	'<form id="signinform">'+
-		'<div class="form-group">'+
-			'<label class="control-label col-xs-2">Username:</label>'+
-			'<div class="col-xs-3">'+
-				'<input class="form-control" id="username" type="text"></input>'+
-			'</div>'+
-		'</div>'+
-		'<div class="form-group">'+
-			'<label class="control-label col-xs-2">Password:</label>'+
-			'<div class="col-xs-3">'+
-				'<input class="form-control" id="password" type="password"></input>'+
-			'</div>'+
-			'<div class="col-xs-3">'+
-				'<input class="btn btn-primary" type="submit" value="Sign In"></input>'+
-			'</div>'+
-		'</div>'+
-	'</form>'+
-'</div>';
-
-document.write(str);
+function checkUserAuth() {
+	DoUserAuth = true;		// true of on Heroku but false of on local node.js platform
+//	DoUserAuth = false;
 }
 
 function showDashboardHeader() {
-str = '<h2><center><img src="lmilogo.png" width="64" height="40"/>&nbsp;Dashboard</center></h2>'+
-	'<div class="wrapper col-xs-12">'+
-	'<button type="button" class="btn btn-info" onClick="exportMetrics()">Export</button> '+
-	'<span class="col-xs-offset-1" id="message1"></span> '+
-	'<a class="btn btn-success" download="RTAexport.csv" id="download">Download file</a> '+
-	'<span id="rtaversion" class="pull-right"></span> '+
-	'</div> '+
-'<div class="wrapper col-xs-12">'+
-'<span>&nbsp;</span>'+
-'</div>';
+	var str = '<h2><center><img src="lmilogo.png" width="64" height="40"/>&nbsp;Dashboard</center></h2>'+
+		'<div class="wrapper col-xs-12">';
+
+	if(DoUserAuth)
+	{
+	str = str + '<div class="col-xs-2">'  +
+			'<div class="g-signin2" data-onsuccess="onSignIn" data-theme="dark"></div>' +
+		'</div>' +
+		'<div id="g-signout" class="col-xs-4">' +
+			'<img id="gprofile-image" class="img-circle" width="48" height="48" alt="Profile Image">' +
+			'<span id="gname">Name</span>' +
+			'<a href="#" class="btn btn-success" onClick="signOut();">Sign Out</a>' +
+		'</div>';
+	}
+	
+	str = str +	'<button id="export" type="button" class="btn btn-info" onClick="exportMetrics()">Export</button> '+
+		'<span class="col-xs-offset-1" id="message1"></span> '+
+		'<a class="btn btn-success" download="RTAexport.csv" id="download">Download file</a> '+
+		'<span id="rtaversion" class="pull-right"></span> '+
+		'</div> '+
+		'<div class="col-xs-4">' +
+			'<p id="error"></p>' +
+		'</div>'+
+		'<div class="wrapper col-xs-12">'+
+			'<span>&nbsp;</span>'+
+		'</div>';
 
 document.write(str);
-}
-
-function showGoogleSignIn() {
-str = '<div class="wrapper col-xs-12">'+
-	'<div id="g-signout" class="col-xs-4">' +
-		'<img id="gprofile-image" class="img-circle" width="48" height="48" alt="Profile Image">' +
-		'<span id="gname">Name</span>' +
-		'<a href="#" class="btn btn-success" onClick="signOut();">Sign Out</a>' +
-	'</div>' +
-	'<div class="col-xs-4">' +
-		'<p id="error"></p>' +
-	'</div>'+
-	'</div>';
-document.write(str);
-DoUserAuth = true;
 }
 
 function showDashboardFooter() {
-str = '<hr size="4" noshade/>'+
+var str = '<hr size="4" noshade/>'+
 	'<div class="wrapper col-xs-12">'+
-	'<span id="ctime" class="pull-right"></span> '+
+		'<span id="ctime" class="pull-right"></span> '+
 	'</div> ';
 	
 document.write(str);

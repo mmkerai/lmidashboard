@@ -26,6 +26,9 @@ $(document).ready(function() {
 
   	$("#g-signout").hide();
   	$("#topTable").hide();
+	$('#rtaversion').text("Bold Dashboard v1.0");
+	$('#download').hide();
+	$('#export').hide();
 	
 	if(DoUserAuth == false)
 		socket.emit('authenticate', {});
@@ -57,6 +60,7 @@ $(document).ready(function() {
 	socket.on('authResponse', function(data){
 		$("#g-signout").show();
 		$("#topTable").show();
+		$("#export").show();
 		if(DoUserAuth)
 		{
 			$("#gname").text(profile.getName());
