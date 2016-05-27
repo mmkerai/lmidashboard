@@ -35,7 +35,7 @@ app.use( bodyParser.json() );       // to support JSON-encoded bodies
 app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
   extended: true
 })); 
-
+/*
 const options = {
   pfx: fs.readFileSync('../sslcert/certificate.pfx'),
   passphrase: 'mango'
@@ -43,7 +43,7 @@ const options = {
 //    pem: fs.readFileSync('certificate.pem'),
 //    cert: fs.readFileSync('boldchat.crt')
 };
-
+*/
 var PORT = Number(process.env.PORT || 1443);
 //var server = https.createServer(options, app).listen(PORT);
 var server = http.createServer(app).listen(PORT);
