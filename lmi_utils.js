@@ -260,8 +260,8 @@ function prepareDownloadFile(data)
 }
 
 function checkUserAuth() {
-//	DoUserAuth = true;		// true of on Heroku but false of on local node.js platform
-	DoUserAuth = false;
+	DoUserAuth = true;		// true of on Heroku but false of on local node.js platform
+//	DoUserAuth = false;
 }
 
 function showDashboardHeader() {
