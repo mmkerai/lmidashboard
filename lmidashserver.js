@@ -1309,21 +1309,19 @@ io.sockets.on('connection', function(socket){
 //	LoggedInUsers.push(socket.id);		// save the socket id so that updates can be sent
 	
 	socket.on('disconnect', function(data){
-		console.log("connection disconnect at "+ TimeNow);
-		var index = LoggedInUsers.indexOf(socket.id);	
-		if(index >= 0) LoggedInUsers.splice(index, 1);	// remove from list of valid users
+		removeSocket(socket.id, "disconnect");
+	});
+	
+	socket.on('error', function(data){
+		removeSocket(socket.id, "error");
 	});
 	
 	socket.on('end', function(data){
-		console.log("connection ended at "+ TimeNow);
-		var index = LoggedInUsers.indexOf(socket.id);	
-		if(index >= 0) LoggedInUsers.splice(index, 1);	// remove from list of valid users
+		removeSocket(socket.id, "end");
 	});
 
 	socket.on('connect_timeout', function(data){
-		console.log("socket timeout at "+ TimeNow);
-		var index = LoggedInUsers.indexOf(socket.id);	
-		if(index >= 0) LoggedInUsers.splice(index, 1);	// remove from list of valid users
+		removeSocket(socket.id, "timeout");
 	});
 
 	socket.on('downloadChats', function(data){
@@ -1387,6 +1385,12 @@ io.sockets.on('connection', function(socket){
 	});
 });
 
+function removeSocket(id, evname) {
+		console.log("socket "+evname+" at "+ TimeNow);
+		var index = LoggedInUsers.indexOf(id);	
+		if(index >= 0) LoggedInUsers.splice(index, 1);	// remove from list of valid users	
+}
+
 function updateChatStats() {
 	var socketid;
 	
@@ -1407,24 +1411,16 @@ function updateChatStats() {
 
 	var str = "Total chats started today: "+Object.keys(AllChats).length;
 	console.log(str);
-	for(var i in LoggedInUsers)
-	{
-		socketid = LoggedInUsers[i];
-		io.sockets.connected[socketid].emit('overallStats',Overall,socketEmitCallback);
-		io.sockets.connected[socketid].emit('departmentStats',Departments,socketEmitCallback);
-		io.sockets.connected[socketid].emit('deptOperators',DeptOperators,socketEmitCallback);
-		io.sockets.connected[socketid].emit('operatorStats',Operators,socketEmitCallback);
-		io.sockets.connected[socketid].emit('consoleLogs',str,socketEmitCallback);
-		io.sockets.connected[socketid].emit('exceptions',Exceptions,socketEmitCallback);
-	}
-	setTimeout(updateChatStats, 2000);	// send update every 2 second
-}
+	console.log("Clients connected: "+io.eio.clientsCount);
+	
+	io.sockets.emit('overallStats',Overall);
+	io.sockets.emit('departmentStats',Departments);
+	io.sockets.emit('deptOperators',DeptOperators);
+	io.sockets.emit('operatorStats',Operators);
+	io.sockets.emit('consoleLogs',str);
+	io.sockets.emit('exceptions',Exceptions);
 
-function socketEmitCallback(err) {
-	if(err)
-		console.log("Socket emit error");
-	else
-		console.log("Socket emit OK");
+	setTimeout(updateChatStats, 2000);	// send update every 2 second
 }
 
 // setup all globals
