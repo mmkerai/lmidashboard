@@ -377,7 +377,7 @@ function postToArchive(postdata) {
 	var options = {
 		host : 'uber-electronics.com', 
 		port : 443, 
-		path : '/home/mkerai/APItriggers/h3gendofday.php', 
+		path : '/home/mkerai/APItriggers/lmiendofday.php', 
 		method : 'POST',
 		headers: {
           'Content-Type': 'text/plain',
@@ -1399,7 +1399,7 @@ function updateChatStats() {
 	{
 		console.log("New day started, stats reset");
 		var csvdata = getCsvChatData();
-		postToArchive(csvdata);
+//		postToArchive(csvdata);
 		doStartOfDay();
 		setTimeout(updateChatStats, 8000);
 		return;
