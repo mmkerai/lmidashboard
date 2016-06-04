@@ -8,20 +8,10 @@ function downloadChats()
 }
 
 $(document).ready(function() {
-
-	checksignedin();
-
-	$('#signinform').submit(function(event) {
-		event.preventDefault();
-		var name = $('#username').val();
-		var pwd = $('#password').val();
-		signin(name,pwd);
-	});
 		
  	socket.on('authErrorResponse', function(data){
 		$("#message1").text(data);
 		$("#topTable").hide();
-		$("#signinform").show();
 	});
 
  	socket.on('errorResponse', function(data){
@@ -29,15 +19,15 @@ $(document).ready(function() {
 	});
 
 	socket.on('authResponse', function(data){
-		saveCookie("username", data.name, 1);	// save as cookie for 1 day
-		saveCookie("password", data.pwd, 1);
-//		console.log("Save cookie: "+data.name+" and pwd "+data.pwd);
-		$('#message1').text("");
-		$('#myname').text(data.name);
-		$('#signinform').hide();
-		$('#topTable').show();
+		$("#g-signout").show();
+		$("#topTable").show();
+		$("#export").show();
+		$("#gname").text(profile.getName());
+		$("#gprofile-image").attr({src: profile.getImageUrl()});
+		$("#error").text("");
+		console.log("User successfully signed in");
 	});
-
+	
 	socket.on('consoleLogs', function(data){
 		$('#conlog').append(data+"\r\n");
 		document.getElementById("conlog").scrollTop = document.getElementById("conlog").scrollHeight	

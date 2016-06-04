@@ -25,17 +25,17 @@ function onSignIn(googleUser) {
 $(document).ready(function() {
 
   	$("#g-signout").hide();
-  	$("#topTable").hide();
+//  	$("#topTable").hide();
 	$('#rtaversion').text("Bold Dashboard v1.0");
 	$('#download').hide();
 	$('#export').hide();
 	
-	if(DoUserAuth == false)
-		socket.emit('authenticate', {});
-
 	socket.on('connection', function(data){
 		console.log("Socket connected");
     });
+	socket.on('error', function(data){
+		console.log("socket error at "+ new Date().toGMTString());
+	});
 	socket.on('connect_timeout', function(data){
 		console.log("socket timeout at "+ new Date().toGMTString());
 	});
@@ -61,11 +61,8 @@ $(document).ready(function() {
 		$("#g-signout").show();
 		$("#topTable").show();
 		$("#export").show();
-		if(DoUserAuth)
-		{
-			$("#gname").text(profile.getName());
-			$("#gprofile-image").attr({src: profile.getImageUrl()});
-		}
+		$("#gname").text(profile.getName());
+		$("#gprofile-image").attr({src: profile.getImageUrl()});
 		$("#error").text("");
 		console.log("User successfully signed in");
 	});

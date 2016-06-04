@@ -265,31 +265,31 @@ function checkUserAuth() {
 }
 
 function showDashboardHeader() {
-	var str = '<h2><center><img src="lmilogo.png" width="64" height="40"/>&nbsp;Dashboard</center></h2>'+
-		'<div class="wrapper col-xs-12">';
-
-	if(DoUserAuth)
-	{
-	str = str + '<div class="col-xs-2">'  +
+	var str = '<h2><center><img src="lmilogo.png"/>&nbsp;Dashboard</center></h2>'+
+		'<div class="wrapper col-xs-12">'+
+			'<span>&nbsp;</span>'+
+		'</div>'+
+		'<div class="wrapper col-xs-12">' +
+		'<div class="col-xs-2">' +
 			'<div class="g-signin2" data-onsuccess="onSignIn" data-theme="dark"></div>' +
 		'</div>' +
 		'<div id="g-signout" class="col-xs-4">' +
 			'<img id="gprofile-image" class="img-circle" width="48" height="48" alt="Profile Image">' +
-			'<span id="gname">Name</span>' +
+			'<span id="gname">Name</span>&nbsp;' +
 			'<a href="#" class="btn btn-success" onClick="signOut();">Sign Out</a>' +
-		'</div>';
-	}
-	
-	str = str +	'<button id="export" type="button" class="btn btn-info" onClick="exportMetrics()">Export</button> '+
-		'<span class="col-xs-offset-1" id="message1"></span> '+
-		'<a class="btn btn-success" download="RTAexport.csv" id="download">Download file</a> '+
+		'</div>' +
+		'<div class="col-xs-4">' +
+			'<button id="export" type="button" class="btn btn-info" onClick="exportMetrics()">Export</button>'+
+			'<span class="col-xs-offset-1" id="message1"></span>' +
+			'<a class="btn btn-success" download="RTAexport.csv" id="download">Download file</a>'+
+		'</div>'+
 		'<span id="rtaversion" class="pull-right"></span> '+
-		'</div> '+
+		'</div>'+
+		'<div class="wrapper col-xs-12">'+
+//			'<span>&nbsp;</span>'+
 		'<div class="col-xs-4">' +
 			'<p id="error"></p>' +
 		'</div>'+
-		'<div class="wrapper col-xs-12">'+
-			'<span>&nbsp;</span>'+
 		'</div>';
 
 document.write(str);

@@ -44,7 +44,7 @@ const options = {
 //    cert: fs.readFileSync('boldchat.crt')
 };
 */
-var PORT = Number(process.env.PORT || 1443);
+var PORT = Number(process.env.PORT || 80);
 //var server = https.createServer(options, app).listen(PORT);
 var server = http.createServer(app).listen(PORT);
 var	io = require('socket.io').listen(server);
@@ -67,8 +67,9 @@ try
 	SETTINGSID = EnVars.APISETTINGSID || 0;
 	KEY = EnVars.APIKEY || 0;
 	SLATHRESHOLD = EnVars.SLATHRESHOLDS || 90;
-	GMAILS = EnVars.USERS || "tropicalfnv@gmail.com";
-	DoUserAuth = false;
+	GMAILS = EnVars.USERS || ["tropicalfnv@gmail.com"];
+	GOOGLE_CLIENT_ID = EnVars.GOOGLE_CLIENT_ID || 0;
+//	DoUserAuth = false;
 }
 catch(e)
 {
@@ -78,7 +79,7 @@ catch(e)
 		AID = process.env.AID || 0;
 		SETTINGSID = process.env.APISETTINGSID || 0;
 		KEY = process.env.APIKEY || 0;
-		GMAILS = process.env.USERS || [];
+		GMAILS = process.env.USERS || ["tropicalfnv@gmail.com"];
 		SLATHRESHOLD = process.env.SLATHRESHOLDS || 90;	
 		GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 0;	
 	}
@@ -1304,7 +1305,7 @@ function getCsvChatData() {
 }
 
 // Set up socket actions and responses
-io.sockets.on('connection', function(socket){
+io.on('connection', function(socket){
 	
 //	LoggedInUsers.push(socket.id);		// save the socket id so that updates can be sent
 	
@@ -1334,12 +1335,7 @@ io.sockets.on('connection', function(socket){
 	socket.on('authenticate', function(data){
 		console.log("authentication request received for: "+data.email);
 		sendToLogs("authentication request received for: "+data.email);
-		if(DoUserAuth == false)
-		{
-			LoggedInUsers.push(socket.id);		// save the socket id so that updates can be sent
-			socket.emit('authResponse',"success");			
-		}
-		else if(GMAILS[data.email] === 'undefined')
+		if(GMAILS[data.email] === 'undefined')
 		{
 			console.log("This gmail is invalid: "+data.email);
 			socket.emit('errorResponse',"Invalid email");
@@ -1412,14 +1408,16 @@ function updateChatStats() {
 	var str = "Total chats started today: "+Object.keys(AllChats).length;
 	console.log(str);
 	console.log("Clients connected: "+io.eio.clientsCount);
-	
-	io.sockets.emit('overallStats',Overall);
-	io.sockets.emit('departmentStats',Departments);
-	io.sockets.emit('deptOperators',DeptOperators);
-	io.sockets.emit('operatorStats',Operators);
-	io.sockets.emit('consoleLogs',str);
-	io.sockets.emit('exceptions',Exceptions);
-
+	for(var i in LoggedInUsers)
+	{
+		socketid = LoggedInUsers[i];
+		io.to(socketid).emit('overallStats',Overall);
+		io.to(socketid).emit('departmentStats',Departments);
+		io.to(socketid).emit('deptOperators',DeptOperators);
+		io.to(socketid).emit('operatorStats',Operators);
+		io.to(socketid).emit('consoleLogs',str);
+		io.to(socketid).emit('exceptions',Exceptions);
+	}
 	setTimeout(updateChatStats, 2000);	// send update every 2 second
 }
 
