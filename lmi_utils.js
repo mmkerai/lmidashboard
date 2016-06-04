@@ -1,8 +1,11 @@
 // utilities for use in dashboard 
 
 var ChatStatus = ["Logged Out","Away","Available"];
+var GOOGLE_CLIENT_ID="817020760023-41aoervnm8ntf76poubf8nq57lp9ek7f.apps.googleusercontent.com";
 var csvfile = null;
 var DoUserAuth = false;
+var Gid_token;
+var profile;
 
 function readCookie(name)
 {
@@ -50,13 +53,6 @@ function delCookie(name)
 	document.cookie = name + "=; expires=Thu, 01-Jan-70 00:00:01 GMT; path=/";
 }
 
-function clearCredentials() {
-	$('#error').text("");
-	delCookie("username");
-	delCookie("password");
-	window.location.reload();
-}
-
 function toHHMMSS(seconds) {
     var sec_num = parseInt(seconds, 10); // don't forget the second param
     var hours   = Math.floor(sec_num / 3600);
@@ -74,20 +70,62 @@ function getURLParameter(name) {
   return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null
 }
 
-function NewWin(htmlfile)		// open a new window
-{
-	WIDTH = 1280;
-	HEIGHT = 768;
-	var left = (screen.width/2)-(WIDTH/2);
-	var top = (screen.height/2)-(HEIGHT/2)-64;
-	var winpop = window.open(htmlfile, '_blank',
-				'toolbar=yes,location=no,status=no,menubar=yes,scrollbars=yes,resizable=yes,width='+WIDTH+',height='+HEIGHT+',top='+top+',left='+left);
-	winpop.focus();
-	return winpop;
+function checksignedin() {
+	
+	$('#rtaversion').text("Bold Dashboard v1.0");
+	gauth2 = gapi.auth2.getAuthInstance();
+    var googleUser = gauth2.currentUser.get();
+	console.log("Current user: "+googleUser.getBasicProfile().getEmail());
+	if(gauth2.isSignedIn.get() == true)
+	{
+		console.log("geezer signed in");
+		$("#g-signout").show();
+		$("#topTable").show();
+		$('#download').show();
+		$('#export').show();	
+	}
+	else
+	{	
+		console.log("geezer not signed in");
+		gauth2.signIn(); 
+		$("#g-signout").hide();
+		$("#topTable").hide();
+		$('#download').hide();
+		$('#export').hide();
+	}
 }
 
-function showSkillGroup(skill,sname) {
-	window.open("skillgroup.html?sgid="+sname, '_blank');
+function initGSignin() {
+    gapi.load('auth2', function() {
+        gapi.auth2.init();
+    });
+}
+	
+function onSignIn(googleUser) {
+	profile = googleUser.getBasicProfile();
+//	console.log("ID: " + profile.getId()); // Don't send this directly to your server!
+//	console.log("Name: " + profile.getName());
+//	console.log("Image URL: " + profile.getImageUrl());
+	console.log("Email: " + profile.getEmail());
+	$("#g-signout").show();
+	$("#topTable").show();
+	$('#download').show();
+	$('#export').show();	
+	Gid_token = googleUser.getAuthResponse().id_token;
+	socket.emit('authenticate', {token: Gid_token, email: profile.getEmail()});
+}
+
+function signOut() {
+	var auth2 = gapi.auth2.getAuthInstance();
+	auth2.signOut().then(function () {
+		console.log('User signed out.');
+		$("#g-signout").hide();
+		$("#topTable").hide();
+		$('#download').hide();
+		$('#export').hide();	
+		if(profile !== 'undefined')
+			socket.emit('un-authenticate', {token: Gid_token, email: profile.getEmail()});
+	});
 }
 
 // print top level table with metrics

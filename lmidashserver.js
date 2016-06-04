@@ -1329,7 +1329,7 @@ io.on('connection', function(socket){
 		console.log("Download chats requested");
 		sendToLogs("Download chats requested");
 		var csvdata = getCsvChatData();
-		socket.emit('chatsCsvResponse',csvdata);	
+		io.to(socket.id).emit('chatsCsvResponse',csvdata);	
 		});
 		
 	socket.on('authenticate', function(data){
@@ -1338,7 +1338,7 @@ io.on('connection', function(socket){
 		if(GMAILS[data.email] === 'undefined')
 		{
 			console.log("This gmail is invalid: "+data.email);
-			socket.emit('errorResponse',"Invalid email");
+			io.to(socket.id).emit('errorResponse',"Invalid email");
 		}
 		else
 		{
@@ -1354,12 +1354,12 @@ io.on('connection', function(socket){
 //				console.log("Response received: "+str);
 				if(jwt.aud == GOOGLE_CLIENT_ID)		// valid token response
 				{
-//					console.log("User authenticated, socket id: "+socket.id);
+					console.log("User authenticated, socket id: "+socket.id);
 					LoggedInUsers.push(socket.id);		// save the socket id so that updates can be sent
-					socket.emit('authResponse',"success");
+					io.to(socket.id).emit('authResponse',"success");
 				}
 				else
-					socket.emit('errorResponse',"Invalid token");
+					io.to(socket.id).emit('errorResponse',"Invalid token");
 				});
 			});
 		}
@@ -1370,7 +1370,7 @@ io.on('connection', function(socket){
 		if(GMAILS[data.email] === 'undefined')
 		{
 			console.log("This gmail is invalid: "+data.email);
-			socket.emit('errorResponse',"Invalid email");
+			io.to(socket.id).emit('errorResponse',"Invalid email");
 		}
 		else
 		{
