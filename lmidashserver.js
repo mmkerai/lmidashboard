@@ -1311,34 +1311,29 @@ io.on('connection', function(socket){
 	
 	socket.on('disconnect', function(data){
 		removeSocket(socket.id, "disconnect");
-	});
-	
+	});	
 	socket.on('error', function(data){
 		removeSocket(socket.id, "error");
-	});
-	
+	});	
 	socket.on('end', function(data){
 		removeSocket(socket.id, "end");
 	});
-
 	socket.on('connect_timeout', function(data){
 		removeSocket(socket.id, "timeout");
 	});
-
 	socket.on('downloadChats', function(data){
 		console.log("Download chats requested");
 		sendToLogs("Download chats requested");
 		var csvdata = getCsvChatData();
-		io.to(socket.id).emit('chatsCsvResponse',csvdata);	
-		});
-		
+		socket.emit('chatsCsvResponse',csvdata);	
+	});		
 	socket.on('authenticate', function(data){
 		console.log("authentication request received for: "+data.email);
 		sendToLogs("authentication request received for: "+data.email);
 		if(GMAILS[data.email] === 'undefined')
 		{
 			console.log("This gmail is invalid: "+data.email);
-			io.to(socket.id).emit('errorResponse',"Invalid email");
+			socket.emit('errorResponse',"Invalid email");
 		}
 		else
 		{
@@ -1356,10 +1351,10 @@ io.on('connection', function(socket){
 				{
 					console.log("User authenticated, socket id: "+socket.id);
 					LoggedInUsers.push(socket.id);		// save the socket id so that updates can be sent
-					io.to(socket.id).emit('authResponse',"success");
+					socket.emit('authResponse',"success");
 				}
 				else
-					io.to(socket.id).emit('errorResponse',"Invalid token");
+					socket.emit('errorResponse',"Invalid token");
 				});
 			});
 		}
@@ -1370,7 +1365,7 @@ io.on('connection', function(socket){
 		if(GMAILS[data.email] === 'undefined')
 		{
 			console.log("This gmail is invalid: "+data.email);
-			io.to(socket.id).emit('errorResponse',"Invalid email");
+			socket.emit('errorResponse',"Invalid email");
 		}
 		else
 		{

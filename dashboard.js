@@ -1,13 +1,11 @@
-var socket = new io();
-
 var Overall = new Object();
 var SkillGroups = new Array();
 
 $(document).ready(function() {
 
-	checksignedin();
+//	checksignedin();
 
-	io.on('connection', function(socket){		
+	socket.on('connection', function(socket){		
 		console.log("Socket connected");
 	});
 	socket.on('error', function(data){
@@ -34,9 +32,11 @@ $(document).ready(function() {
 		}
 	});	
 	socket.on('authResponse', function(data){
+		var profile = googleUser.getBasicProfile();
 		$("#g-signout").show();
 		$("#topTable").show();
 		$("#export").show();
+		$('#download').hide();
 		$("#gname").text(profile.getName());
 		$("#gprofile-image").attr({src: profile.getImageUrl()});
 		$("#error").text("");

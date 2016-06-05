@@ -1,11 +1,11 @@
 // utilities for use in dashboard 
-
+var socket = new io.connect();
 var ChatStatus = ["Logged Out","Away","Available"];
 var GOOGLE_CLIENT_ID="817020760023-41aoervnm8ntf76poubf8nq57lp9ek7f.apps.googleusercontent.com";
 var csvfile = null;
 var DoUserAuth = false;
-var Gid_token;
-var profile;
+var googleUser;
+
 
 function readCookie(name)
 {
@@ -70,15 +70,15 @@ function getURLParameter(name) {
   return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null
 }
 
-function checksignedin() {
+function checksignedin(gauth2) {
 	
 	$('#rtaversion').text("Bold Dashboard v1.0");
-	gauth2 = gapi.auth2.getAuthInstance();
-    var googleUser = gauth2.currentUser.get();
-	console.log("Current user: "+googleUser.getBasicProfile().getEmail());
+//	gauth2 = gapi.auth2.getAuthInstance();
 	if(gauth2.isSignedIn.get() == true)
 	{
 		console.log("geezer signed in");
+		googleUser = gauth2.currentUser.get();
+		console.log("Current user: "+googleUser.getBasicProfile().getEmail());
 		$("#g-signout").show();
 		$("#topTable").show();
 		$('#download').show();
@@ -87,7 +87,8 @@ function checksignedin() {
 	else
 	{	
 		console.log("geezer not signed in");
-		gauth2.signIn(); 
+		var gPromise = gauth2.signIn(); 
+		gauth2.isSignedIn.listen(signinListener)
 		$("#g-signout").hide();
 		$("#topTable").hide();
 		$('#download').hide();
@@ -95,36 +96,46 @@ function checksignedin() {
 	}
 }
 
+function signinListener() {
+	console.log("Listener signed in");
+	var gauth2 = gapi.auth2.getAuthInstance();
+	googleUser = gauth2.currentUser.get();
+	onSignIn(googleUser);	// do app authentication
+}
+
 function initGSignin() {
-    gapi.load('auth2', function() {
-        gapi.auth2.init();
-    });
+	console.log("gapi initialised");
+	var gauth2 = gapi.auth2.getAuthInstance();
+//    gapi.load('auth2', function() {
+//        gapi.auth2.init("{'scope': 'profile'}");
+//    });
+	checksignedin(gauth2);
 }
 	
 function onSignIn(googleUser) {
-	profile = googleUser.getBasicProfile();
+	var profile = googleUser.getBasicProfile();
 //	console.log("ID: " + profile.getId()); // Don't send this directly to your server!
 //	console.log("Name: " + profile.getName());
 //	console.log("Image URL: " + profile.getImageUrl());
-	console.log("Email: " + profile.getEmail());
-	$("#g-signout").show();
-	$("#topTable").show();
-	$('#download').show();
-	$('#export').show();	
-	Gid_token = googleUser.getAuthResponse().id_token;
-	socket.emit('authenticate', {token: Gid_token, email: profile.getEmail()});
+	console.log("Email: " + profile.getEmail());	
+	var gid_token = googleUser.getAuthResponse().id_token;
+	socket.emit('authenticate', {token: gid_token, email: profile.getEmail()});
 }
 
 function signOut() {
 	var auth2 = gapi.auth2.getAuthInstance();
 	auth2.signOut().then(function () {
 		console.log('User signed out.');
-		$("#g-signout").hide();
-		$("#topTable").hide();
-		$('#download').hide();
-		$('#export').hide();	
-		if(profile !== 'undefined')
-			socket.emit('un-authenticate', {token: Gid_token, email: profile.getEmail()});
+		if(googleUser !== 'undefined')
+		{
+			var profile = googleUser.getBasicProfile();
+			$("#g-signout").hide();
+			$("#topTable").hide();
+			$('#download').hide();
+			$('#export').hide();	
+			if(typeof profile !== 'undefined')
+				socket.emit('un-authenticate', {token: googleUser.getAuthResponse().id_token, email: profile.getEmail()});
+		}
 	});
 }
 
