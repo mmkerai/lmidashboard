@@ -3,7 +3,10 @@ var SkillGroups = new Array();
 
 $(document).ready(function() {
 
-//	checksignedin();
+	$("#g-signout").hide();
+	$("#topTable").hide();
+	$("#export").hide();
+	$('#download').hide();
 
 	socket.on('connection', function(socket){		
 		console.log("Socket connected");

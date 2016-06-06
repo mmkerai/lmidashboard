@@ -3,7 +3,6 @@ var socket = new io.connect();
 var ChatStatus = ["Logged Out","Away","Available"];
 var GOOGLE_CLIENT_ID="817020760023-41aoervnm8ntf76poubf8nq57lp9ek7f.apps.googleusercontent.com";
 var csvfile = null;
-var DoUserAuth = false;
 var googleUser;
 
 
@@ -72,27 +71,20 @@ function getURLParameter(name) {
 
 function checksignedin(gauth2) {
 	
-	$('#rtaversion').text("Bold Dashboard v1.0");
 //	gauth2 = gapi.auth2.getAuthInstance();
 	if(gauth2.isSignedIn.get() == true)
 	{
 		console.log("geezer signed in");
 		googleUser = gauth2.currentUser.get();
 		console.log("Current user: "+googleUser.getBasicProfile().getEmail());
-		$("#g-signout").show();
-		$("#topTable").show();
-		$('#download').show();
-		$('#export').show();	
+		onSignIn(googleUser);	// do app authentication
+	
 	}
 	else
 	{	
 		console.log("geezer not signed in");
 		var gPromise = gauth2.signIn(); 
-		gauth2.isSignedIn.listen(signinListener)
-		$("#g-signout").hide();
-		$("#topTable").hide();
-		$('#download').hide();
-		$('#export').hide();
+		gauth2.isSignedIn.listen(signinListener);
 	}
 }
 
@@ -109,6 +101,7 @@ function initGSignin() {
 //    gapi.load('auth2', function() {
 //        gapi.auth2.init("{'scope': 'profile'}");
 //    });
+	$('#rtaversion').text("Bold Dashboard v1.0");
 	checksignedin(gauth2);
 }
 	
