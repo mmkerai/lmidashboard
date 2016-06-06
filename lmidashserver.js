@@ -93,7 +93,7 @@ if(AID == 0 || SETTINGSID == 0 || KEY == 0)
 	process.exit(1);
 }
 
-var TriggerDomain = "https://lmidomain";		// used to validate the signature of push data
+var TriggerDomain = "https://bolddashboard.herokuapp.com";		// used to validate the signature of push data
 
 //****** Callbacks for all URL requests
 app.get('/', function(req, res){
