@@ -147,14 +147,18 @@ var Exception = function() {
 		this.operatorIDUndefined = 0;
 };
 
-//******* Global class for CSAT data
-var CSAT = function() {
-		this.nps = 0;	
-		this.responsive = 0;	
-		this.professional = 0;		
-		this.knowledge = 0;	
-		this.overall = 0;
-		this.comments = "";
+//******* Global class for chat reassigned data
+var Reassigns = function() {
+		this.chatID = 0;	
+		this.reassignments = new Array();	
+};
+
+//******* Global class for chat reassigned data
+var Ra = function() {
+		this.reassigned = 0;	
+		this.operatorID = 0;	
+		this.departmentID = 0;		
+		this.ended = 0;
 };
 
 //******* Global class for chat data
@@ -168,7 +172,6 @@ var ChatData = function(chatid, dept, sg) {
 		this.answered = 0;			// so it is easy to do the calculations
 		this.ended = 0;
 		this.closed = 0;
-		this.csat = new CSAT();
 };
 
 //******** Global class for dashboard metrics
@@ -221,6 +224,7 @@ var OpMetrics  = function(id,name) {
 //********************************* Global variables for chat data
 var LoggedInUsers;	// used for socket ids
 var AllChats;
+var ChatsReassigned;
 var	Departments;	// array of dept ids and dept name objects
 var	DeptOperators;	// array of operators by dept id
 var	OperatorDepts;	// array of depts for each operator
@@ -287,6 +291,7 @@ function encryptSignature(unencryptedSignature) {
 function initialiseGlobals () {
 	LoggedInUsers = new Array();
 	AllChats = new Object();
+	ChatsReassigned = new Object();
 	Departments = new Object();	
 	DeptOperators = new Object();
 	OperatorDepts = new Object();
@@ -357,6 +362,17 @@ app.post('/operator-status-changed', function(req, res) {
 			processOperatorStatusChanged(req.body);
 			sendToLogs("operator-status-changed, operator id: "+Operators[req.body.LoginID].name);
 		}
+	}
+	res.send({ "result": "success" });
+});
+
+// Process incoming Boldchat triggered chat data
+app.post('/chat-reassigned', function(req, res){
+	if(validateSignature(req.body, TriggerDomain+'/chat-reassigned'))
+	{
+		sendToLogs("Chat-reassigned, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
+		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
+			processChatReassigned(req.body);
 	}
 	res.send({ "result": "success" });
 });
@@ -810,6 +826,28 @@ function processOperatorStatusChanged(ostatus) {
 				Departments[depts[did]].oavail--;
 			}
 		}
+	}
+}
+
+function processChatReassigned(chat) {
+	var deptobj,opobj;
+	
+	var reassign = new Ra();
+	reassign.reassigned = TimeNow;
+	reassign.operatorID = chat.OperatorID;
+	reassign.departmentID = chat.DepartmentID;
+	reassign.ended = chat.Ended;
+	var ra = ChatsReassigned[chat.ChatID] || 0;
+	if(!ra)
+	{
+		ra.reassigments.push(reassign);
+	}
+	else
+	{
+		var cr = new Reassigns();
+		cr.chatID = chat.ChatID;
+		cr.reassigments.push(reassign);
+		ChatsReassigned[chat.ChatID] = cr;		
 	}
 }
 
@@ -1305,6 +1343,46 @@ function getCsvChatData() {
 	return(csvChats);	
 }
 
+function getChatTransferData() {	
+	var key, value;
+	var chatTransData = "";
+	var tchat = new Object();
+	key = Object.keys(ChatsReassigned)[0];
+	tchat = ChatsReassigned[key];
+	for(key in tchat)
+	{
+		chatTransData = chatTransData +key+ ",";
+	}
+	chatTransData = chatTransData + "\r\n";
+	// now add the data
+	for(var i in ChatsReassigned)
+	{
+		tchat = ChatsReassigned[i];
+		value = "\"=\"\"" + tchat.chatID + "\"\"\"";
+		for(ra in tchat.reassigments)
+		{
+			for(key in ra)
+			{
+				if(key === "departmentID")
+					value = Departments[ra[key]].name;
+				else if(key === "operator")
+				{
+					if(typeof(Operators[ra[key]]) !== 'undefined')
+						value = Operators[ra[key]].name;
+				}
+				else if(!isNaN(ra[key]))
+					value = "\"=\"\"" + ra[key] + "\"\"\"";
+				else
+					value = ra[key];
+				
+				chatTransData = chatTransData +value+ ",";
+			}
+		}
+		chatTransData = chatTransData + "\r\n";
+	}
+	return(chatTransData);	
+}
+
 // Set up socket actions and responses
 io.on('connection', function(socket){
 	
@@ -1327,7 +1405,13 @@ io.on('connection', function(socket){
 		sendToLogs("Download chats requested");
 		var csvdata = getCsvChatData();
 		socket.emit('chatsCsvResponse',csvdata);	
-	});		
+	});
+	socket.on('downloadChatTransfers', function(data){
+		console.log("Download Chats Transfer requested");
+		sendToLogs("Download chats Transfer requested");
+		var chattransferdata = getChatTransferData();
+		socket.emit('chatTransferResponse',chattransferdata);
+	});	
 	socket.on('authenticate', function(data){
 		console.log("authentication request received for: "+data.email);
 		sendToLogs("authentication request received for: "+data.email);

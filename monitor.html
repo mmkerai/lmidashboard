@@ -15,7 +15,6 @@
 	<script src="monitor.js"></script>
 </head>
 <body>
-<script>checkUserAuth()</script>
 <script>showDashboardHeader()</script>
 <div class="wrapper col-xs-12">
 <span>&nbsp;</span>
@@ -26,9 +25,11 @@
 	<p id="exp"></p>
 	<p></p>
 	<span class="btn btn-info" onClick='downloadChats()'>Download today's chat summary</span>
+	<span class="btn btn-info" onClick='downloadChatTransfers()'>Download chat transfers</span>
 	<p class="text-center" id="message"></p>
 	<p class="text-center" id="result"></p>
-	<p class="text-center"><a class="btn btn-default" download="dashchats.csv" id="link2" href=""></a></p>
+	<p class="text-center"><a class="btn btn-default" download="dashchats.csv" id="todayschats" href=""></a></p>
+	<p class="text-center"><a class="btn btn-default" download="chattransfers.csv" id="chattransfers" href=""></a></p>
 </div>
 </body>
 </html>
