@@ -105,7 +105,8 @@ function initGSignin() {
 	checksignedin(gauth2);
 }
 	
-function onSignIn(googleUser) {
+function onSignIn(gUser) {
+	googleUser = gUser;		// incase this was called directly from signin button
 	var profile = googleUser.getBasicProfile();
 //	console.log("ID: " + profile.getId()); // Don't send this directly to your server!
 //	console.log("Name: " + profile.getName());
