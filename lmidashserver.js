@@ -256,9 +256,9 @@ function validateSignature(body, triggerUrl) {
 	if(encrypted == body.signature)
 		return true;
 	
-	console.log("Trigger signature validation: "+triggerUrl);
+	console.log("Trigger signature validation failed: "+triggerUrl);
 //	debugLog(triggerUrl,body);
-	return true;	// while testing - change to false afterwards
+	return false;	// while testing - change to false afterwards
 };
 
 function getUnencryptedSignature(body, triggerUrl) {
@@ -274,7 +274,8 @@ function getUnencryptedSignature(body, triggerUrl) {
 	}
 
 	var separator = triggerUrl.indexOf('?') === -1 ? '?' : '&';
-	return triggerUrl + separator + paramNameValues.join('&');
+	var unc = triggerUrl + separator + paramNameValues.join('&');
+	return unc.replace(/%20/g,'+');
 }
 
 function encryptSignature(unencryptedSignature) {
