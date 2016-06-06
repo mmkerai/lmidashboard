@@ -420,7 +420,7 @@ function sendToLogs(text) {
 	for(var i in LoggedInUsers)
 	{
 		socketid = LoggedInUsers[i];
-		io.sockets.connected[socketid].emit('consoleLogs', text);
+		io.to(socketid).emit('consoleLogs', text);
 	}
 }
 
@@ -1377,7 +1377,7 @@ io.on('connection', function(socket){
 });
 
 function removeSocket(id, evname) {
-		console.log("socket "+evname+" at "+ TimeNow);
+		console.log("Socket "+evname+" at "+ TimeNow);
 		var index = LoggedInUsers.indexOf(id);	
 		if(index >= 0) LoggedInUsers.splice(index, 1);	// remove from list of valid users	
 }

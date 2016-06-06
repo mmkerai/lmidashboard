@@ -5,7 +5,10 @@ var Operators = new Array();
 $(document).ready(function() {
 did = getURLParameter("did");
 
-//	checksignedin();
+	$("#g-signout").hide();
+	$("#topTable").hide();
+	$("#export").hide();
+	$('#download').hide();
 
 	socket.on('connection', function(data){
 		console.log("Socket connected");
