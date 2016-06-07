@@ -821,10 +821,13 @@ function processOperatorStatusChanged(ostatus) {
 // this trigger is fired when the chat-reassigned event occcurs
 function processChatReassigned(chat) {
 	
-	var tchat = AllChats[chat.ChatID].answered || 0; // chat could have been triggered by ACD before chat answered
+	var tchat = AllChats[chat.ChatID] || 0; // chat could have been triggered by ACD before chat answered
 	var opobj = Operators[chat.OperatorID] || 0;	// operator may be blank if re-assigned to dept by acd
-	if(!opobj || !tchat)	
-		return;
+	if(!opobj || !tchat)
+		return(console.log("Tchat and opobj: "+tchat+" and "+opobj));
+	
+	if(tchat.answered == 0)
+		return(console.log("Not answered");
 	
 	var reassign = new Ra();
 	reassign.started = AllChats[chat.ChatID].started;
