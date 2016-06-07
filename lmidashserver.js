@@ -614,7 +614,7 @@ function processAnsweredChat(chat) {
 	opobj = Operators[chat.OperatorID];
 	if(typeof(opobj) === 'undefined') return;		// an operator that doesnt exist (may happen if created midday)
 
-	if(chat.Answered == null && chat.Answered == "")
+	if(chat.Answered == null || chat.Answered == "")
 	{
 		Exceptions.chatAnsweredIsBlank++;
 		return;
@@ -682,18 +682,8 @@ function processClosedChat(chat) {
 		var chattime = Math.round((AllChats[chat.ChatID].closed - AllChats[chat.ChatID].started)/1000);
 		opobj.tcta = opobj.tcta + chattime;
 		// now remove from active chat list and update stats
-		var achats = new Array();
-		achats = opobj.activeChats;
-		for(var x in achats) // go through each chat
-		{
-			if(achats[x] == chat.ChatID)
-			{
-				achats.splice(x,1);
-				opobj.activeChats = achats;		// save back after removing
-			}
-		}
-		
-		var closedchats = opobj.tcan - achats.length;	// answered chat less active
+		removeActiveChat(opobj, chat.ChatID);	
+		var closedchats = opobj.tcan - opobj.activeChats.length;	// answered chat less active
 		if(closedchats > 0)
 			opobj.act = Math.round(opobj.tcta/closedchats);
 
@@ -828,14 +818,24 @@ function processOperatorStatusChanged(ostatus) {
 		}
 	}
 }
-
+// this trigger is fired when the chat-reassigned event occcurs
 function processChatReassigned(chat) {
 	
+	var tchat = AllChats[chat.ChatID].answered || 0; // chat could have been triggered by ACD before chat answered
+	var opobj = Operators[chat.OperatorID] || 0;	// operator may be blank if re-assigned to dept by acd
+	if(!opobj || !tchat)	
+		return;
+	
 	var reassign = new Ra();
-	reassign.reassigned = TimeNow;
-	reassign.operatorID = chat.OperatorID;
-	reassign.departmentID = chat.DepartmentID;
-	reassign.ended = chat.Ended;
+	reassign.started = AllChats[chat.ChatID].started;
+	reassign.operatorID = AllChats[chat.ChatID].operatorID;
+	reassign.departmentID = AllChats[chat.ChatID].departmentID;
+	reassign.ended = TimeNow;
+	AllChats[chat.ChatID].operatorID = chat.OperatorID;
+	AllChats[chat.ChatID].departmentID = chat.DepartmentID;
+	removeActiveChat(opobj, chat.ChatID);
+	opobj.activeChats.push(chat.ChatID);
+	
 	var ra = ChatsReassigned[chat.ChatID];
 	if(typeof ra !== 'undefined')
 	{
@@ -874,6 +874,18 @@ function updateCSAT(tchat) {
 	
 }
 
+function removeActiveChat(opobj, chatid) {
+	var achats = new Array();
+	achats = opobj.activeChats;
+	for(var x in achats) // go through each chat
+	{
+		if(achats[x] == chatid)
+		{
+			achats.splice(x,1);
+			opobj.activeChats = achats;		// save back after removing
+		}
+	}
+}
 // calculate ACT and Chat per hour - both are done after chats are complete (closed)
 function calculateACT_CPH() {
 	var tchat, sgid;
@@ -1347,20 +1359,12 @@ function getChatTransferData() {
 	var key, value;
 	var chatTransData = "";
 	var tchat = new Object();
-/*	key = Object.keys(ChatsReassigned)[0];
-	tchat = ChatsReassigned[key];
-	for(key in tchat)
-	{
-		chatTransData = chatTransData +key+ ",";
-	}
-	chatTransData = chatTransData + "\r\n";*/
-	chatTransData = "Chat ID,Reassigned,Department,Operator,Ended\r\n";
+	chatTransData = "Chat ID,Reassigned,Operator,Department,Ended\r\n";
 	// now add the data
 	for(var i in ChatsReassigned)
 	{
 		tchat = ChatsReassigned[i];
-		console.log("Re Chat id: "+tchat.chatID);
-		chatTransData = chatTransData + "\"=\"\"" + tchat.chatID + "\"\"\"";
+		chatTransData = chatTransData + "\"=\"\"" + tchat.chatID + "\"\"\",";
 		for(var i in tchat.reassigments)
 		{
 			var ra = tchat.reassigments[i];
