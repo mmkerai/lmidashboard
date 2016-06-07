@@ -829,14 +829,16 @@ function processChatReassigned(chat) {
 		return(console.log("Not yet answered"));
 	
 	var reassign = new Ra();
+	removeActiveChat(Operators[tchat.operatorID], chat.ChatID);		// remove from previous operator
+	Operators[tchat.operatorID].tcan--;
+	Operators[chat.OperatorID].activeChats.push(chat.ChatID);		// add to new operator
+	Operators[chat.OperatorID].tcan++;
 	reassign.started = tchat.started;
 	reassign.operatorID = tchat.operatorID;
 	reassign.departmentID = tchat.departmentID;
 	reassign.ended = TimeNow;
 	tchat.operatorID = chat.OperatorID;
 	tchat.departmentID = chat.DepartmentID;
-	removeActiveChat(Operators[tchat.operatorID], chat.ChatID);		// remove from previous operator
-	Operators[chat.OperatorID].activeChats.push(chat.ChatID);		// add to new operator
 	
 	var ra = ChatsReassigned[chat.ChatID];
 	if(typeof ra !== 'undefined')
