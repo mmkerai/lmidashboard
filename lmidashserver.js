@@ -822,22 +822,21 @@ function processOperatorStatusChanged(ostatus) {
 function processChatReassigned(chat) {
 	
 	var tchat = AllChats[chat.ChatID] || 0; // chat could have been triggered by ACD before chat answered
-	var opobj = Operators[chat.OperatorID] || 0;	// operator may be blank if re-assigned to dept by acd
-	if(!opobj || !tchat)
-		return(console.log("Tchat and opobj: "+tchat+" and "+opobj));
+	if(!tchat)
+		return(console.log("Tchat undefined"));
 	
 	if(tchat.answered == 0)
-		return(console.log("Not answered"));
+		return(console.log("Not yet answered"));
 	
 	var reassign = new Ra();
-	reassign.started = AllChats[chat.ChatID].started;
-	reassign.operatorID = AllChats[chat.ChatID].operatorID;
-	reassign.departmentID = AllChats[chat.ChatID].departmentID;
+	reassign.started = tchat.started;
+	reassign.operatorID = tchat.operatorID;
+	reassign.departmentID = tchat.departmentID;
 	reassign.ended = TimeNow;
-	AllChats[chat.ChatID].operatorID = chat.OperatorID;
-	AllChats[chat.ChatID].departmentID = chat.DepartmentID;
-	removeActiveChat(opobj, chat.ChatID);
-	opobj.activeChats.push(chat.ChatID);
+	tchat.operatorID = chat.OperatorID;
+	tchat.departmentID = chat.DepartmentID;
+	removeActiveChat(Operators[tchat.operatorID], chat.ChatID);		// remove from previous operator
+	Operators[chat.operatorID].activeChats.push(chat.ChatID);		// add to new operator
 	
 	var ra = ChatsReassigned[chat.ChatID];
 	if(typeof ra !== 'undefined')
