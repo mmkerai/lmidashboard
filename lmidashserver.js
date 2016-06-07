@@ -836,7 +836,7 @@ function processChatReassigned(chat) {
 	tchat.operatorID = chat.OperatorID;
 	tchat.departmentID = chat.DepartmentID;
 	removeActiveChat(Operators[tchat.operatorID], chat.ChatID);		// remove from previous operator
-	Operators[chat.operatorID].activeChats.push(chat.ChatID);		// add to new operator
+	Operators[chat.OperatorID].activeChats.push(chat.ChatID);		// add to new operator
 	
 	var ra = ChatsReassigned[chat.ChatID];
 	if(typeof ra !== 'undefined')
