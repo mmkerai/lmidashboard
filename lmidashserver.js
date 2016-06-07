@@ -837,8 +837,8 @@ function processChatReassigned(chat) {
 	reassign.operatorID = chat.OperatorID;
 	reassign.departmentID = chat.DepartmentID;
 	reassign.ended = chat.Ended;
-	var ra = ChatsReassigned[chat.ChatID] || 0;
-	if(!ra)
+	var ra = ChatsReassigned[chat.ChatID];
+	if(typeof ra !== 'undefined')
 	{
 		ra.reassigments.push(reassign);
 	}
@@ -849,6 +849,7 @@ function processChatReassigned(chat) {
 		cr.reassigments.push(reassign);
 		ChatsReassigned[chat.ChatID] = cr;		
 	}
+	console.log("Chat reassignment saved");
 }
 
 function updateCconc(tchat) {
@@ -1359,7 +1360,7 @@ function getChatTransferData() {
 	{
 		tchat = ChatsReassigned[i];
 		value = "\"=\"\"" + tchat.chatID + "\"\"\"";
-		for(ra in tchat.reassigments)
+		for(var ra in tchat.reassigments)
 		{
 			for(key in ra)
 			{
