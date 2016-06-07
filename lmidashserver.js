@@ -830,7 +830,6 @@ function processOperatorStatusChanged(ostatus) {
 }
 
 function processChatReassigned(chat) {
-	var deptobj,opobj;
 	
 	var reassign = new Ra();
 	reassign.reassigned = TimeNow;
@@ -1348,29 +1347,29 @@ function getChatTransferData() {
 	var key, value;
 	var chatTransData = "";
 	var tchat = new Object();
-	key = Object.keys(ChatsReassigned)[0];
+/*	key = Object.keys(ChatsReassigned)[0];
 	tchat = ChatsReassigned[key];
 	for(key in tchat)
 	{
 		chatTransData = chatTransData +key+ ",";
 	}
-	chatTransData = chatTransData + "\r\n";
+	chatTransData = chatTransData + "\r\n";*/
+	chatTransData = "Chat ID,Reassigned,Department,Operator,Ended\r\n";
 	// now add the data
 	for(var i in ChatsReassigned)
 	{
 		tchat = ChatsReassigned[i];
-		value = "\"=\"\"" + tchat.chatID + "\"\"\"";
-		for(var ra in tchat.reassigments)
+		console.log("Re Chat id: "+tchat.chatID);
+		chatTransData = chatTransData + "\"=\"\"" + tchat.chatID + "\"\"\"";
+		for(var i in tchat.reassigments)
 		{
+			var ra = tchat.reassigments[i];
 			for(key in ra)
 			{
 				if(key === "departmentID")
 					value = Departments[ra[key]].name;
-				else if(key === "operator")
-				{
-					if(typeof(Operators[ra[key]]) !== 'undefined')
-						value = Operators[ra[key]].name;
-				}
+				else if(key === "operatorID")
+					value = Operators[ra[key]].name;
 				else if(!isNaN(ra[key]))
 					value = "\"=\"\"" + ra[key] + "\"\"\"";
 				else
