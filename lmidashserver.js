@@ -827,7 +827,7 @@ function processChatReassigned(chat) {
 		return(console.log("Tchat and opobj: "+tchat+" and "+opobj));
 	
 	if(tchat.answered == 0)
-		return(console.log("Not answered");
+		return(console.log("Not answered"));
 	
 	var reassign = new Ra();
 	reassign.started = AllChats[chat.ChatID].started;
