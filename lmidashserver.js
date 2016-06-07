@@ -846,7 +846,7 @@ function processChatReassigned(chat) {
 	{
 		var cr = new Reassigns();
 		cr.chatID = chat.ChatID;
-		cr.reassigments.push(reassign);
+		cr.reassigments = new Array(reassign);
 		ChatsReassigned[chat.ChatID] = cr;		
 	}
 	console.log("Chat reassignment saved");
