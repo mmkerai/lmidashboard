@@ -155,7 +155,7 @@ var Reassigns = function() {
 
 //******* Global class for chat reassigned data
 var Ra = function() {
-		this.reassigned = 0;	
+		this.started = 0;	
 		this.operatorID = 0;	
 		this.departmentID = 0;		
 		this.ended = 0;
@@ -1362,12 +1362,12 @@ function getCsvChatData() {
 function getChatTransferData() {	
 	var key, value;
 	var chatTransData = "";
-	var tchat = new Object();
-	chatTransData = "Chat ID,Reassigned,Operator,Department,Ended\r\n";
+	var tchat;
+	chatTransData = "Chat ID,Started,Operator,Department,Ended\r\n";
 	// now add the data
-	for(var i in ChatsReassigned)
+	for(var j in ChatsReassigned)
 	{
-		tchat = ChatsReassigned[i];
+		tchat = ChatsReassigned[j];
 		chatTransData = chatTransData + "\"=\"\"" + tchat.chatID + "\"\"\",";
 		for(var i in tchat.reassigments)
 		{
