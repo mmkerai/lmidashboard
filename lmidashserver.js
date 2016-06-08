@@ -819,7 +819,7 @@ function processOperatorStatusChanged(ostatus) {
 	}
 }
 // this trigger is fired when the chat-reassigned event occcurs
-function processChatReassigned(chat) {
+/*function processChatReassigned(chat) {
 	
 	var tchat = AllChats[chat.ChatID] || 0; // chat could have been triggered by ACD before chat answered
 	if(!tchat)
@@ -852,6 +852,40 @@ function processChatReassigned(chat) {
 		cr.reassigments = new Array(reassign);
 		ChatsReassigned[chat.ChatID] = cr;		
 	}
+	console.log("Chat reassignment saved");
+}*/
+
+function processChatReassigned(chat) {
+	var numra
+	
+	if(chat.Answered == "")
+		return(console.log("Not yet answered"));
+	
+	var ra = new Ra();
+	var reassign = ChatsReassigned[chat.ChatID];
+	if(typeof reassign === 'undefined')	// first reassignment so save previous operator
+	{
+		ra.started = chat.Started;
+		ra.operatorID = chat.LastAssignedByOperatorID;
+		ra.departmentID = chat.DepartmentID;
+		ra.ended = TimeNow;
+		reassign = new Reassigns();
+		reassign.chatID = chat.ChatID;
+		reassign.reassigments = new Array(ra);
+		ChatsReassigned[chat.ChatID] = reassign;
+	}
+	if((numra=ChatsReassigned[chat.ChatID].reassignments.length) > 1)	// not the first reassignment
+	{
+		var previousra = reassign.reassignments[numra-1];
+		previousra.ended = TimeNow;
+	}	
+	
+	// now add the new reassignment
+	ra.started = TimeNow;
+	ra.operatorID = chat.OperatorID;
+	ra.departmentID = chat.DepartmentID;
+	ra.ended = 0;	
+	reassign.reassigments.push(ra);
 	console.log("Chat reassignment saved");
 }
 
@@ -1534,7 +1568,7 @@ function checkOperatorAvailability() {
 	sendToLogs("Getting operator availability again");
 	getOperatorAvailabilityData();	// try again
 }
-
+console.log("Server started on port "+PORT);
 doStartOfDay();		// initialise everything
 setTimeout(updateChatStats,8000);	// updates socket io data at infinitum
-console.log("Server started on port "+PORT);
+
