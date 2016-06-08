@@ -885,7 +885,7 @@ function processChatReassigned(chat) {
 	ra2.started = TimeNow;
 	ra2.operatorID = chat.OperatorID;
 	ra2.departmentID = chat.DepartmentID;
-	ra2.ended = 0;	
+	ra2.ended = 0;
 	ChatsReassigned[chat.ChatID].reassigments.push(ra2);
 	console.log("Chat reassignment saved");
 }
