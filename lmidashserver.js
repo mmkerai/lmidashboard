@@ -1397,16 +1397,19 @@ function getCsvChatData() {
 function getChatTransferData() {	
 	var key, value;
 	var chatTransData = "";
-	var tchat;
+	var tchat = new Object();
+	var ra = new Object();
+	var cra = new Array();
 	chatTransData = "Chat ID,Started,Operator,Department,Ended\r\n";
 	// now add the data
-	for(var j in ChatsReassigned)
+	for(var j in ChatsReassigned)	// iterate through objects
 	{
 		tchat = ChatsReassigned[j];
 		chatTransData = chatTransData + "\"=\"\"" + tchat.chatID + "\"\"\",";
-		for(var i in tchat.reassignments)
+		cra = tchat.reassignments;
+		for(var i=0; i < cra.length; i++) // iterate through array
 		{
-			var ra = tchat.reassignments[i];
+			ra = cra[i];
 			for(key in ra)
 			{
 				if(key === "departmentID")
