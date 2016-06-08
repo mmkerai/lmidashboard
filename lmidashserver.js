@@ -888,6 +888,8 @@ function processChatReassigned(chat) {
 	ra2.ended = 0;
 	ChatsReassigned[chat.ChatID].reassignments.push(ra2);
 	console.log("Chat reassignment saved");
+	var chattransferdata = getChatTransferData();
+	io.emit('chatTransferResponse',chattransferdata);
 }
 
 function updateCconc(tchat) {
