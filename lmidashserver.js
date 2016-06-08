@@ -861,10 +861,10 @@ function processChatReassigned(chat) {
 	if(chat.Answered == "")
 		return(console.log("Not yet answered"));
 	
-	var ra = new Ra();
-	var reassign = ChatsReassigned[chat.ChatID];
-	if(typeof reassign === 'undefined')	// first reassignment so save previous operator
+	var reas = ChatsReassigned[chat.ChatID];
+	if(typeof reas === 'undefined')	// first reassignment so save previous operator
 	{
+		var ra = new Ra();
 		ra.started = chat.Started;
 		ra.operatorID = chat.LastAssignedByOperatorID;
 		ra.departmentID = chat.DepartmentID;
@@ -881,11 +881,12 @@ function processChatReassigned(chat) {
 	}	
 	
 	// now add the new reassignment
-	ra.started = TimeNow;
-	ra.operatorID = chat.OperatorID;
-	ra.departmentID = chat.DepartmentID;
-	ra.ended = 0;	
-	reassign.reassigments.push(ra);
+	var ra2 = new Ra();
+	ra2.started = TimeNow;
+	ra2.operatorID = chat.OperatorID;
+	ra2.departmentID = chat.DepartmentID;
+	ra2.ended = 0;	
+	ChatsReassigned[chat.ChatID].reassigments.push(ra2);
 	console.log("Chat reassignment saved");
 }
 
