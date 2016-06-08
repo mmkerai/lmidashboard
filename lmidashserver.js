@@ -1397,7 +1397,7 @@ function getCsvChatData() {
 }
 
 function getChatTransferData() {	
-	var key, value;
+	var key, value, index;
 	var chatTransData = "";
 	var tchat = new Object();
 	var ra = new Object();
@@ -1414,14 +1414,15 @@ function getChatTransferData() {
 			ra = cra[i];
 			for(key in ra)
 			{
-				if(key === "departmentID")
-					value = Departments[ra[key]].name;
-				else if(key === "operatorID")
-					value = Operators[ra[key]].name;
-				else if(!isNaN(ra[key]))
-					value = "\"=\"\"" + ra[key] + "\"\"\"";
+				index = ra[key] || 0;
+				if(key === "departmentID" && index != 0)
+					value = Departments[index].name;
+				else if(key === "operatorID" && index != 0)
+					value = Operators[index].name;
+				else if(!isNaN(index))
+					value = "\"=\"\"" + index + "\"\"\"";
 				else
-					value = ra[key];
+					value = index;
 				
 				chatTransData = chatTransData +value+ ",";
 			}
@@ -1457,8 +1458,7 @@ io.on('connection', function(socket){
 	socket.on('downloadChatTransfers', function(data){
 		console.log("Download Chats Transfer requested");
 		sendToLogs("Download chats Transfer requested");
-//		var chattransferdata = getChatTransferData();
-		var chattransferdata = getCsvChatData();
+		var chattransferdata = getChatTransferData();
 		socket.emit('chatTransferResponse',chattransferdata);
 	});	
 	socket.on('authenticate', function(data){
