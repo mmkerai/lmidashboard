@@ -888,7 +888,8 @@ function processChatReassigned(chat) {
 	ra2.ended = 0;
 	ChatsReassigned[chat.ChatID].reassignments.push(ra2);
 	console.log("Chat reassignment saved");
-	debugLog("Chats reassigned: ",ChatsReassigned[chat.ChatID]);
+	debugLog("Chats reassigned1: ",ChatsReassigned[chat.ChatID].reassignments[0]);
+	debugLog("Chats reassigned2: ",ChatsReassigned[chat.ChatID].reassignments[1]);
 }
 
 function updateCconc(tchat) {
@@ -1456,7 +1457,8 @@ io.on('connection', function(socket){
 	socket.on('downloadChatTransfers', function(data){
 		console.log("Download Chats Transfer requested");
 		sendToLogs("Download chats Transfer requested");
-		var chattransferdata = getChatTransferData();
+//		var chattransferdata = getChatTransferData();
+		var chattransferdata = getCsvChatData();
 		socket.emit('chatTransferResponse',chattransferdata);
 	});	
 	socket.on('authenticate', function(data){
