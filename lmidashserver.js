@@ -937,9 +937,7 @@ function updateCSAT(chat) {
 	chatobj.csat.NPS = chat.NPS || null;
 	var ft = chat.firsttime || null;
 	var resolved = chat.resolved || 0;
-//	console.log("NPS is "+chatobj.csat.NPS);
-//	console.log("OSAT is "+chatobj.csat.OSAT);
-//	console.log("first is "+ft);
+	debugLog("Chat fields", chat);
 	if(chatobj.csat.NPS == null && chatobj.csat.OSAT == null && ft == null)
 	{
 		console.log("Csat is null");
@@ -1384,9 +1382,8 @@ function allInactiveChats(chats) {
 					chat.NPS = chat.CustomFields.NPS || null;
 					chat.rateadvisor = chat.CustomFields.rateadvisor || null;
 					chat.firsttime = chat.CustomFields.firsttime || null;
-//					debugLog("Csat fields", chat.CustomFields);
 					delete chat["CustomFields"];
-					chats[i] = chat;
+//					chats[i] = chat;
 					updateCSAT(chats[i]);
 				}
 			}
