@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>LMI Dashboard CSAT</title>
+    <meta name="google-signin-scope" content="profile email">
+    <meta name="google-signin-client_id" content="817020760023-41aoervnm8ntf76poubf8nq57lp9ek7f.apps.googleusercontent.com">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.3.min.js"></script>
+    <script src="https://apis.google.com/js/platform.js?onload=initGSignin" async defer></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css"/>
+	<link rel="stylesheet" href="lmi_dashboard.css"/>
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="thresholds.js"></script>
+	<script src="lmi_utils.js"></script>
+	<script src="csat.js"></script>
+</head>
+<body>
+<script>showDashboardHeader()</script>
+<div class="form-horizontal col-xs-12">
+	<table id="csatTable" class="table table-fixed">
+	  <thead>
+	    <colgroup>
+            <col class="col-md-1">
+        </colgroup>
+		<tr>
+		  <th width="25%" title="Name of operator">Operator Name</th>
+		  <th width="15%" title="Chats Completed">Chats Answered</th>
+		  <th width="15%" title="Number of surveys completed">No. of Surveys</th>
+		  <th width="15%" title="First chat resolution">FCR</th>
+		  <th width="15%" title="Overall agent satisfaction (rateadvisor)">OSAT</th>
+		  <th width="15%" title="Net Promoter Score">NPS</th>
+		  </tr>
+		</thead>
+		<tbody>
+		</tbody>
+	</table>
+</div>
+<script>showDashboardFooter()</script>
+</body>
+</html>

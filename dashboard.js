@@ -25,7 +25,7 @@ $(document).ready(function() {
 	});	
 	socket.on('overallStats', function(data) {		
 		$("#ctime").text("Last refreshed: "+new Date().toLocaleString());
-		Overall = data;
+//		Overall = data;
 		showTopLevelStats(data);
 	});		
 	socket.on('departmentStats', function(ddata){
@@ -46,17 +46,6 @@ $(document).ready(function() {
 		console.log("User successfully signed in");
 	});
 });
-
-function showDeptLevelStats(data) {
-	var rowid;
-	var ttable = document.getElementById("topTable");
-	rowid = document.getElementById(data.name);
-	if(rowid === null)		// row doesnt exist so create one
-	{
-		rowid = createDeptRow(ttable, data.did, data.name);
-	}
-	showTopMetrics(rowid,data);
-}
 
 function showDepartment(did,dname) {
 	window.open("department.html?did="+did, '_blank');

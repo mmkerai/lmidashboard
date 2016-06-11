@@ -12,6 +12,7 @@
 // tcuq - total chats unanswered/abandoned in queue
 // tcua - total chats unanswered/abandoned after assigned
 // tcun - total chats unavailable
+// tcc - total chats completed
 // asa - average speed to answer
 // act - average chat time
 // acc - available chat capacity
@@ -129,6 +130,12 @@ app.get('/monitor.html', function(req, res){
 app.get('/monitor.js', function(req, res){
 	res.sendFile(__dirname + '/monitor.js');
 });
+app.get('/csat.html', function(req, res){
+	res.sendFile(__dirname + '/csat.html');
+});
+app.get('/csat.js', function(req, res){
+	res.sendFile(__dirname + '/csat.js');
+});
 app.get('/google82ada2049e314439.html', function(req, res){
 	res.sendFile(__dirname + '/google82ada2049e314439.html');
 });
@@ -161,6 +168,14 @@ var Ra = function() {
 		this.ended = 0;
 };
 
+//******* Global class for csat data
+var Csat = function() {
+		this.surveys = 0;	
+		this.NPS = 0;	
+		this.FCR = 0;		
+		this.OSAT = 0;
+};
+
 //******* Global class for chat data
 var ChatData = function(chatid, dept, sg) {
 		this.chatID = chatid;
@@ -172,6 +187,7 @@ var ChatData = function(chatid, dept, sg) {
 		this.answered = 0;			// so it is easy to do the calculations
 		this.ended = 0;
 		this.closed = 0;
+		this.csat = new Csat();
 };
 
 //******** Global class for dashboard metrics
@@ -189,6 +205,7 @@ var DashMetrics = function(did,name,sg) {
 		this.tco = 0;
 		this.tac = 0;
 		this.tcan = 0;
+		this.tcc = 0;
 		this.tcuq = 0;
 		this.tcua = 0;
 		this.tcun = 0;
@@ -197,7 +214,8 @@ var DashMetrics = function(did,name,sg) {
 		this.act = 0;
 		this.acc = 0;
 		this.oaway = 0;
-		this.oavail = 0;	
+		this.oavail = 0;
+		this.csat = new Csat();
 };
 
 //**************** Global class for operator metrics
@@ -207,6 +225,7 @@ var OpMetrics  = function(id,name) {
 		this.ccap = 2;		// assume chat capacity of 2
 		this.cconc = 0;		// chat concurrency
 		this.tcan = 0;		// total chats answered
+		this.tcc = 0;	// chats closed (= answered-active)
 		this.cph = 0;
 		this.csla = 0;		// chats answered within SLA
 		this.status = 0;	// 0 - logged out, 1 - away, 2 - available
@@ -219,6 +238,7 @@ var OpMetrics  = function(id,name) {
 		this.act = 0;	// average chat time for operator
 		this.tct = 0;	// total chat time with atleast one chat
 		this.mct = 0;	// multi chat time i.e. more than 1 chat
+		this.csat = new Csat();
 };																				
 
 //********************************* Global variables for chat data
@@ -672,6 +692,7 @@ function processClosedChat(chat) {
 	AllChats[chat.ChatID].status = 0;		// inactive/complete/cancelled/closed
 	AllChats[chat.ChatID].ended = new Date(chat.Ended);
 	AllChats[chat.ChatID].closed = new Date(chat.Closed);
+	deptobj.tcc++;
 
 	if(chat.OperatorID != "" && chat.OperatorID != null)
 	{
@@ -683,9 +704,9 @@ function processClosedChat(chat) {
 		opobj.tcta = opobj.tcta + chattime;
 		// now remove from active chat list and update stats
 		removeActiveChat(opobj, chat.ChatID);	
-		var closedchats = opobj.tcan - opobj.activeChats.length;	// answered chat less active
-		if(closedchats > 0)
-			opobj.act = Math.round(opobj.tcta/closedchats);
+		opobj.tcc = opobj.tcan - opobj.activeChats.length;	// answered chat less active
+		if(opobj.tcc > 0)
+			opobj.act = Math.round(opobj.tcta/opobj.tcc);
 
 		updateCconc(AllChats[chat.ChatID]);	// update chat conc now that it is closed
 	}
@@ -910,9 +931,40 @@ function updateCconc(tchat) {
 	OperatorCconc[tchat.operatorID] = conc;		// save it back for next time
 }
 
-function updateCSAT(tchat) {
-	chatobj = AllChats[tchat.ChatID];
+function updateCSAT(chat) {
+	var chatobj = AllChats[chat.ChatID];
+	chatobj.csat.OSAT = chat.rateadvisor || null;
+	chatobj.csat.NPS = chat.NPS || null;
+	var ft = chat.firsttime || null;
+	var resolved = chat.resolved || 0;
+//	console.log("NPS is "+chatobj.csat.NPS);
+//	console.log("OSAT is "+chatobj.csat.OSAT);
+//	console.log("first is "+ft);
+	if(chatobj.csat.NPS == null && chatobj.csat.OSAT == null && ft == null)
+	{
+		console.log("Csat is null");
+		return;
+	}
+	// update dept and operator stats
+	if(ft == "Yes" && resolved == "Yes")
+		chatobj.csat.FCR = 1;
+	else
+		chatobj.csat.FCR = 0;
+	var opobj = Operators[chat.OperatorID];
+	var deptobj = Departments[chat.DepartmentID];
+	if(typeof(opobj) === 'undefined' || typeof(deptobj) === 'undefined') return;
 	
+	var numd = deptobj.csat.surveys++;
+	var numo = opobj.csat.surveys++;
+	deptobj.csat.NPS = ((deptobj.csat.NPS*numd) + chatobj.csat.NPS)/deptobj.csat.surveys;
+	deptobj.csat.OSAT = ((deptobj.csat.OSAT*numd) + chatobj.csat.OSAT)/deptobj.csat.surveys;
+	deptobj.csat.FCR = ((deptobj.csat.FCR*numd) + chatobj.csat.FCR)/deptobj.csat.surveys;
+	
+	opobj.csat.NPS = ((opobj.csat.NPS*numo) + chatobj.csat.NPS)/opobj.csat.surveys;
+	opobj.csat.OSAT = ((opobj.csat.OSAT*numo) + chatobj.csat.OSAT)/opobj.csat.surveys;
+	opobj.csat.FCR = ((opobj.csat.FCR*numo) + chatobj.csat.FCR)/opobj.csat.surveys;
+	
+	console.log("CSAT updated");
 }
 
 function removeActiveChat(opobj, chatid) {
@@ -1326,6 +1378,17 @@ function allInactiveChats(chats) {
 			{
 				processAnsweredChat(chats[i]);	//  answered
 				processClosedChat(chats[i]);	// and closed
+				if(Object.keys(chats[i].CustomFields).length > 0)
+				{
+					var chat = chats[i];
+					chat.NPS = chat.CustomFields.NPS || null;
+					chat.rateadvisor = chat.CustomFields.rateadvisor || null;
+					chat.firsttime = chat.CustomFields.firsttime || null;
+//					debugLog("Csat fields", chat.CustomFields);
+					delete chat["CustomFields"];
+					chats[i] = chat;
+					updateCSAT(chats[i]);
+				}
 			}
 			else
 				processWindowClosed(chats[i]);	// closed after starting before being answered

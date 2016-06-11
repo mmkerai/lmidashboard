@@ -145,6 +145,39 @@ function showTopLevelStats(data) {
 	showTopMetrics(rowid,data);
 }
 
+function showDeptLevelStats(data) {
+	var rowid;
+	var ttable = document.getElementById("topTable");
+	rowid = document.getElementById(data.name);
+	if(rowid === null)		// row doesnt exist so create one
+	{
+		rowid = createDeptRow(ttable, data.did, data.name);
+	}
+	showTopMetrics(rowid,data);
+}
+
+function showOperatorStats(data) {
+	var rowid;
+	var ttable = document.getElementById("deptTable");
+	rowid = document.getElementById(data.name);
+	if(rowid === null)		// row doesnt exist so create one
+	{
+		rowid = createOperatorRow(ttable, data.oid, data.name);
+	}
+	showOperatorMetrics(rowid,data);
+}
+
+function showCsatStats(data) {
+	var rowid;
+	var ttable = document.getElementById("csatTable");
+	rowid = document.getElementById(data.name);
+	if(rowid === null)		// row doesnt exist so create one
+	{
+		rowid = createCsatRow(ttable, data.oid, data.name);
+	}
+	showCsatMetrics(rowid,data);
+}
+
 function createTopRow(tableid, id, name) {
 	
 	row = tableid.insertRow();	
@@ -154,7 +187,10 @@ function createTopRow(tableid, id, name) {
 	{
 		row.insertCell(i);
 	}
-	row.cells[0].outerHTML = "<th class='h3g_link' onClick=\"showSkillGroup('"+id+"','"+name+"')\">"+name+"</th>";
+	if(row.rowIndex == 1)		// not the title but next one download
+		row.cells[0].outerHTML = "<th class='h3g_link' onClick=\"showDeptCsat('"+id+"','"+name+"')\">"+name+"</th>";	
+	else
+		row.cells[0].outerHTML = "<th class='h3g_link' onClick=\"showSkillGroup('"+id+"','"+name+"')\">"+name+"</th>";
 
 	return row;
 }
@@ -170,6 +206,32 @@ function createDeptRow(tableid, id, name) {
 	}
 	row.cells[0].outerHTML = "<th class='h3g_link' onClick=\"showDepartment('"+id+"','"+name+"')\">"+name+"</th>";
 
+	return row;
+}
+
+function createOperatorRow(tableid, id, name) {
+	
+	row = tableid.insertRow();	// there is already a header row and top row
+	row.id = name;
+	var cols = tableid.rows[0].cells.length;
+	for(var i=0; i < cols; i++)
+	{
+		row.insertCell(i);
+	}
+	row.cells[0].outerHTML = "<th class='h3g_link' onClick=\"showOpCsat('"+id+"','"+name+"')\">"+name+"</th>";
+	return row;
+}
+
+function createCsatRow(tableid, id, name) {
+	
+	row = tableid.insertRow();	// there is already a header row and top row
+	row.id = name;
+	var cols = tableid.rows[0].cells.length;
+	for(var i=0; i < cols; i++)
+	{
+		row.insertCell(i);
+	}
+	row.cells[0].outerHTML = "<th>"+name+"</th>";
 	return row;
 }
 
@@ -201,7 +263,6 @@ function showTopMetrics(rowid, data) {
 }
 
 function showOperatorMetrics(rowid, data) {
-
 	var act = 0;
 	if(data.tct > 0)
 		act = Math.round(data.tct/data.tcan);
@@ -215,6 +276,20 @@ function showOperatorMetrics(rowid, data) {
 	rowid.cells[7].innerHTML = data.cph;	
 	rowid.cells[8].outerHTML = NF.printACT(act);	
 	rowid.cells[9].outerHTML = NF.printConcurrency(data.cconc);
+}
+
+function showCsatMetrics(rowid, data) {
+	var fcr = Math.round(data.csat.FCR*100) + "%";
+	
+	rowid.cells[1].innerHTML = data.tcc;
+	rowid.cells[2].innerHTML = data.csat.surveys;
+	rowid.cells[3].innerHTML = fcr;
+	rowid.cells[4].innerHTML = data.csat.OSAT;
+	rowid.cells[5].innerHTML = data.csat.NPS;
+}
+
+function showDeptCsat(did,dname) {
+	window.open("csat.html?did="+did, '_blank');
 }
 
 /* build csvfile from table to export snapshot

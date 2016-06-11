@@ -4,9 +4,10 @@ var Operators = new Array();
 
 $(document).ready(function() {
 did = getURLParameter("did");
+oid = getURLParameter("oid");
 
 	$("#g-signout").hide();
-	$("#deptTable").hide();
+	$("#csatTable").hide();
 	$("#export").hide();
 	$('#download').hide();
 
@@ -25,29 +26,39 @@ did = getURLParameter("did");
  	socket.on('errorResponse', function(data){
 		$("#message1").text(data);
 	});
-	socket.on('deptOperators', function(ddata){
-		DeptOperators = ddata[did];	// get dept operators
+	socket.on('deptOperators', function(data){
+		DeptOperators = data[did];	// get dept operators
 	});
-	socket.on('operatorStats', function(ddata){
-		$("#ctime").text("Last refreshed: "+new Date().toLocaleString());
-		for(var i in ddata)
-		{
-			if(DeptOperators.indexOf(ddata[i].oid) != -1)		// only of this operator belongs to this dept
+	if(did != null)
+	{
+		socket.on('departmentStats', function(data){
+			$("#ctime").text("Last refreshed: "+new Date().toLocaleString());
+			for(var i in data)
 			{
-				if(ddata[i].status == 0 && ddata[i].tcan == 0)	// if logged out and have not answered some chats today
-					continue;
-				else	
+				if(did == data[i].did)		// only if this is the department
 				{
-//					Operators.push(ddata[i]);
-					showOperatorStats(ddata[i]);
+					showCsatStats(data[i]);
 				}
 			}
-		}
-	});	
+		});	
+	}
+	else
+	{
+		socket.on('operatorStats', function(data){
+			$("#ctime").text("Last refreshed: "+new Date().toLocaleString());
+			for(var i in data)
+			{
+				if(oid == data[i].oid)		// only if this operator belongs to this dept
+				{
+					showCsatStats(data[i]);
+				}
+			}
+		});
+	}
 	socket.on('authResponse', function(data){
 		var profile = googleUser.getBasicProfile();
 		$("#g-signout").show();
-		$("#deptTable").show();
+		$("#csatTable").show();
 		$("#export").show();
 		$('#download').hide();
 		$("#gname").text(profile.getName());
@@ -56,6 +67,30 @@ did = getURLParameter("did");
 		console.log("User successfully signed in");
 	});
 });
+
+function showOperatorStats(data) {
+	var rowid;
+	var ttable = document.getElementById("deptTable");
+	rowid = document.getElementById(data.name);
+	if(rowid === null)		// row doesnt exist so create one
+	{
+		rowid = createOperatorRow(ttable, data.oid, data.name);
+	}
+	showOperatorMetrics(rowid,data);
+}
+
+function createOperatorRow(tableid, id, name) {
+	
+	row = tableid.insertRow();	// there is already a header row and top row
+	row.id = name;
+	var cols = tableid.rows[0].cells.length;
+	for(var i=0; i < cols; i++)
+	{
+		row.insertCell(i);
+	}
+	row.cells[0].outerHTML = "<th>"+name+"</th>";
+	return row;
+}
 
 /*function createDeptRow(tableid,index,sg,name) {
 
@@ -80,10 +115,6 @@ did = getURLParameter("did");
 			
 	return row;
 }*/
-
-function showOpCsat(oid,dname) {
-	window.open("csat.html?oid="+oid, '_blank');
-}
 
 function exportMetrics() {
 	console.log("Exporting operator metrics");
