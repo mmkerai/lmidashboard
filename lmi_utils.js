@@ -280,12 +280,14 @@ function showOperatorMetrics(rowid, data) {
 
 function showCsatMetrics(rowid, data) {
 	var fcr = Math.round(data.csat.FCR*100) + "%";
+	var resolved = Math.round(data.csat.Resolved*100) + "%";
 	
 	rowid.cells[1].innerHTML = data.tcc;
 	rowid.cells[2].innerHTML = data.csat.surveys;
 	rowid.cells[3].innerHTML = fcr;
-	rowid.cells[4].innerHTML = data.csat.OSAT;
-	rowid.cells[5].innerHTML = data.csat.NPS;
+	rowid.cells[4].innerHTML = resolved;
+	rowid.cells[5].innerHTML = Math.round(data.csat.OSAT);
+	rowid.cells[6].innerHTML = Math.round(data.csat.NPS);
 }
 
 function showDeptCsat(did,dname) {

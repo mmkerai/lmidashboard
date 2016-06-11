@@ -174,6 +174,7 @@ var Csat = function() {
 		this.NPS = 0;	
 		this.FCR = 0;		
 		this.OSAT = 0;
+		this.Resolved = 0;
 };
 
 //******* Global class for chat data
@@ -936,9 +937,9 @@ function updateCSAT(chat) {
 	chatobj.csat.OSAT = chat.rateadvisor || null;
 	chatobj.csat.NPS = chat.NPS || null;
 	var ft = chat.firsttime || null;
-	var resolved = chat.resolved || 0;
-	debugLog("Chat fields", chat);
-	if(chatobj.csat.NPS == null && chatobj.csat.OSAT == null && ft == null)
+	var resolved = chat.resolved || null;
+//	debugLog("Chat fields", chat);
+	if(chatobj.csat.NPS == null && chatobj.csat.OSAT == null && ft == null && resolved == null)
 	{
 		console.log("Csat is null");
 		return;
@@ -948,6 +949,10 @@ function updateCSAT(chat) {
 		chatobj.csat.FCR = 1;
 	else
 		chatobj.csat.FCR = 0;
+	if(resolved == "Yes")
+		chatobj.csat.Resolved = 1;
+	else
+		chatobj.csat.Resolved = 0;
 	var opobj = Operators[chat.OperatorID];
 	var deptobj = Departments[chat.DepartmentID];
 	if(typeof(opobj) === 'undefined' || typeof(deptobj) === 'undefined') return;
@@ -957,10 +962,12 @@ function updateCSAT(chat) {
 	deptobj.csat.NPS = ((deptobj.csat.NPS*numd) + chatobj.csat.NPS)/deptobj.csat.surveys;
 	deptobj.csat.OSAT = ((deptobj.csat.OSAT*numd) + chatobj.csat.OSAT)/deptobj.csat.surveys;
 	deptobj.csat.FCR = ((deptobj.csat.FCR*numd) + chatobj.csat.FCR)/deptobj.csat.surveys;
+	deptobj.csat.Resolved = ((deptobj.csat.Resolved*numd) + chatobj.csat.Resolved)/deptobj.csat.surveys;
 	
 	opobj.csat.NPS = ((opobj.csat.NPS*numo) + chatobj.csat.NPS)/opobj.csat.surveys;
 	opobj.csat.OSAT = ((opobj.csat.OSAT*numo) + chatobj.csat.OSAT)/opobj.csat.surveys;
 	opobj.csat.FCR = ((opobj.csat.FCR*numo) + chatobj.csat.FCR)/opobj.csat.surveys;
+	opobj.csat.Resolved = ((opobj.csat.Resolved*numo) + chatobj.csat.Resolved)/opobj.csat.surveys;
 	
 	console.log("CSAT updated");
 }
@@ -1382,8 +1389,8 @@ function allInactiveChats(chats) {
 					chat.NPS = chat.CustomFields.NPS || null;
 					chat.rateadvisor = chat.CustomFields.rateadvisor || null;
 					chat.firsttime = chat.CustomFields.firsttime || null;
+					chat.resolved = chat.CustomFields.resolved || null;
 					delete chat["CustomFields"];
-//					chats[i] = chat;
 					updateCSAT(chats[i]);
 				}
 			}
