@@ -57,10 +57,10 @@ var AID;
 var SETTINGSID;
 var KEY;
 var SLATHRESHOLD;
+var MAXCHATCONCURRENCY;
 var GMAILS = [];
 var GOOGLE_CLIENT_ID;
-var DoUserAuth = true;
-
+var DoUserAuth = true;	// default do manual auth from JSON
 try
 {
 	EnVars = JSON.parse(fs.readFileSync('config.json', 'utf8'));
@@ -70,7 +70,7 @@ try
 	SLATHRESHOLD = EnVars.SLATHRESHOLDS || 90;
 	GMAILS = EnVars.USERS || ["tropicalfnv@gmail.com"];
 	GOOGLE_CLIENT_ID = EnVars.GOOGLE_CLIENT_ID || 0;
-//	DoUserAuth = false;
+	MAXCHATCONCURRENCY = EnVars.MAXCHATCONCURRENCY || 2;
 }
 catch(e)
 {
@@ -82,6 +82,7 @@ catch(e)
 		KEY = process.env.APIKEY || 0;
 		GMAILS = process.env.USERS || ["tropicalfnv@gmail.com"];
 		SLATHRESHOLD = process.env.SLATHRESHOLDS || 90;	
+		MAXCHATCONCURRENCY = process.env.MAXCHATCONCURRENCY || 2;	
 		GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 0;	
 	}
 	else
@@ -140,32 +141,22 @@ app.get('/google82ada2049e314439.html', function(req, res){
 	res.sendFile(__dirname + '/google82ada2049e314439.html');
 });
 
+process.on('uncaughtException', function (err) {
+  console.log('Exception: ' + err);
+});
+
 //********************************* Global class exceptions
 var Exception = function() {
-		this.chatAnsweredIsBlank = 0;
 		this.chatAnsweredNotInList = 0;
-		this.chatEndedIsBlank = 0;
-		this.chatClosedIsBlank = 0;		
 		this.chatClosedNotInList = 0;
 		this.chatsAbandoned = 0;
-		this.chatsUnavailable = 0;
 		this.chatsBlocked = 0;
-		this.customStatusUndefined = 0;
 		this.operatorIDUndefined = 0;
-};
-
-//******* Global class for chat reassigned data
-var Reassigns = function() {
-		this.chatID = 0;	
-		this.reassignments = new Array();	
-};
-
-//******* Global class for chat reassigned data
-var Ra = function() {
-		this.started = 0;	
-		this.operatorID = 0;	
-		this.departmentID = 0;		
-		this.ended = 0;
+		this.noCsatInfo = 0;
+		this.signatureInvalid = 0;
+		this.refreshedAnsweredChat = 0;
+		this.APIDataError = 0;
+		this.jsonDataError = 0;
 };
 
 //******* Global class for csat data
@@ -188,6 +179,7 @@ var ChatData = function(chatid, dept, sg) {
 		this.answered = 0;			// so it is easy to do the calculations
 		this.ended = 0;
 		this.closed = 0;
+		this.statustype = 0;	// as per chatstatustype field in BC
 		this.csat = new Csat();
 };
 
@@ -206,7 +198,6 @@ var DashMetrics = function(did,name,sg) {
 		this.tco = 0;
 		this.tac = 0;
 		this.tcan = 0;
-		this.tcc = 0;
 		this.tcuq = 0;
 		this.tcua = 0;
 		this.tcun = 0;
@@ -223,7 +214,7 @@ var DashMetrics = function(did,name,sg) {
 var OpMetrics  = function(id,name) {
 		this.oid = id;		// operator id
 		this.name = name;
-		this.ccap = 2;		// assume chat capacity of 2
+		this.maxcc = Number(MAXCHATCONCURRENCY);		// max chat concurrenccy
 		this.cconc = 0;		// chat concurrency
 		this.tcan = 0;		// total chats answered
 		this.tcc = 0;	// chats closed (= answered-active)
@@ -245,7 +236,6 @@ var OpMetrics  = function(id,name) {
 //********************************* Global variables for chat data
 var LoggedInUsers;	// used for socket ids
 var AllChats;
-var ChatsReassigned;
 var	Departments;	// array of dept ids and dept name objects
 var	DeptOperators;	// array of operators by dept id
 var	OperatorDepts;	// array of depts for each operator
@@ -256,6 +246,7 @@ var	Operators;	// array of operator ids and name objects
 var	CustomStatus;	// array of custom status names
 var ApiDataNotReady;	// Flag to show when data has been received from API so that data can be processed
 var TimeNow;			// global for current time
+var StartOfDay;			// global time for start of the day before all stats are reset
 var EndOfDay;			// global time for end of the day before all stats are reset
 var Overall;		// top level stats
 var	OperatorsSetupComplete;
@@ -281,9 +272,12 @@ function validateSignature(body, triggerUrl) {
 	if(encrypted == body.signature)
 		return true;
 	
-	console.log("Trigger signature validation failed: "+triggerUrl);
+	var str = "Trigger signature validation error: "+triggerUrl;
+	Exceptions.signatureInvalid++;
+	console.log(str);
+	sendToLogs(str);
 //	debugLog(triggerUrl,body);
-	return false;	// while testing - change to false afterwards
+	return true;	// true while testing - change to false afterwards
 };
 
 function getUnencryptedSignature(body, triggerUrl) {
@@ -312,7 +306,6 @@ function encryptSignature(unencryptedSignature) {
 function initialiseGlobals () {
 	LoggedInUsers = new Array();
 	AllChats = new Object();
-	ChatsReassigned = new Object();
 	Departments = new Object();	
 	DeptOperators = new Object();
 	OperatorDepts = new Object();
@@ -322,8 +315,13 @@ function initialiseGlobals () {
 	Operators = new Object();
 	CustomStatus = new Object();
 	TimeNow = new Date();
+	StartOfDay = new Date();
+//	StartOfDay.setHours(StartOfDay.getHours() + TOFFSET);	// allow for TIMEZONE
+	StartOfDay.setUTCHours(0,0,0,0);	// first milli second of the day
+//	StartOfDay.setHours(StartOfDay.getHours() - TOFFSET);	// allow for TIMEZONE
 	EndOfDay = new Date();
 	EndOfDay.setUTCHours(23,59,59,999);	// last milli second of the day
+//	EndOfDay.setHours(EndOfDay.getHours() - TOFFSET);	// allow for TIMEZONE
 	Overall = new DashMetrics("Overall","Overall");	
 	OperatorsSetupComplete = false;
 	ApiDataNotReady = 0;
@@ -378,22 +376,9 @@ app.post('/chat-window-closed', function(req, res){
 app.post('/operator-status-changed', function(req, res) { 
 	if(validateSignature(req.body, TriggerDomain+'/operator-status-changed'))
 	{
+		sendToLogs("operator-status-changed, operator id: "+Operators[req.body.LoginID].name);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
-		{
 			processOperatorStatusChanged(req.body);
-			sendToLogs("operator-status-changed, operator id: "+Operators[req.body.LoginID].name);
-		}
-	}
-	res.send({ "result": "success" });
-});
-
-// Process incoming Boldchat triggered chat data
-app.post('/chat-reassigned', function(req, res){
-	if(validateSignature(req.body, TriggerDomain+'/chat-reassigned'))
-	{
-		sendToLogs("Chat-reassigned, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
-		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
-			processChatReassigned(req.body);
 	}
 	res.send({ "result": "success" });
 });
@@ -407,9 +392,28 @@ function BC_API_Request(api_method,params,callBackFunction) {
 		host : 'api.boldchat.com', 
 		port : 443, 
 		path : '/aid/'+AID+'/data/rest/json/v1/'+api_method+'?auth='+authHash+'&'+params, 
-		method : 'GET'
-		};
-	https.request(options, callBackFunction).on('error', function(err){console.log("HTML error"+err.stack)}).end();
+		method : 'GET',
+		agent : false
+	};
+//	https.request(options, callBackFunction).on('error', function(err){console.log("API request error: "+err.stack)}).end();
+	ApiDataNotReady++;		// flag to track api calls	
+	var getReq = https.request(options, function(res) {
+//		console.log("\nstatus code: ", res.statusCode);
+		var str = "";
+		res.on('data', function(data) {
+			str += data;
+		});
+		res.on('end', function() {
+			ApiDataNotReady--;
+			callBackFunction(str);
+		});
+		res.on('error', function(err){
+			ApiDataNotReady--;
+			console.log("API request error: ", err);
+		});     
+	});
+    //end the request
+    getReq.end();
 }
 
 function postToArchive(postdata) {
@@ -600,51 +604,27 @@ function operatorCustomStatusCallback(dlist) {
 
 // process started chat object and update all relevat dept, operator and global metrics
 function processStartedChat(chat) {
-	if(chat.DepartmentID == null || chat.DepartmentID == "") return;// should never be null at this stage but I have seen it
 	var deptobj = Departments[chat.DepartmentID];
-	if(typeof(deptobj) === 'undefined') return;		// a dept we are not interested in
-
-	var tchat = new ChatData(chat.ChatID, chat.DepartmentID, deptobj.skillgroup);
+	if(typeof(deptobj) === 'undefined') return false;		// a dept we are not interested in
+	
+	var tchat = new ChatData(chat.ChatID, chat.DepartmentID, Departments[chat.DepartmentID].skillgroup);
 	tchat.started = new Date(chat.Started);
 	tchat.status = 1;	// waiting to be answered
 	AllChats[chat.ChatID] = tchat;		// save this chat details
-}
-
-// process unavailable chat object. Occurs when visitor gets the unavailable message as ACD queue is full or nobody available
-function processUnavailableChat(chat) {
-	if(chat.DepartmentID === null) return;	
-	var deptobj = Departments[chat.DepartmentID];
-	if(typeof(deptobj) === 'undefined') return;		// a dept we are not interested in
-	// make sure that this is genuine and sometime this event is triggered for an old closed chat
-	if((chat.Started == "" || chat.Started == null) && (chat.Answered == "" || chat.Answered == null))
-	{
-		deptobj.tcun++;
-		Overall.tcun++;
-	}
+	return true;
 }
 
 // active chat means a started chat has been answered by an operator so it is no longer in the queue
 function processAnsweredChat(chat) {
 	var deptobj, opobj;
 	
-	if(chat.DepartmentID == null || chat.DepartmentID == "") return;	// should never be null at this stage but I have seen it
-	if(chat.OperatorID == null || chat.OperatorID == "") return;		// operator id not set for some strange reason
-
 	deptobj = Departments[chat.DepartmentID];
-	if(typeof(deptobj) === 'undefined') return;		// a dept we are not interested in
-	opobj = Operators[chat.OperatorID];
-	if(typeof(opobj) === 'undefined') return;		// an operator that doesnt exist (may happen if created midday)
-
-	if(chat.Answered == null || chat.Answered == "")
-	{
-		Exceptions.chatAnsweredIsBlank++;
-		return;
-	}
+	if(typeof(deptobj) === 'undefined') return false;		// a dept we are not interested in
 	
-	if(typeof(AllChats[chat.ChatID]) === 'undefined')	// if this chat did not exist (only happens if missed it during startup)
+	if(typeof(AllChats[chat.ChatID]) === 'undefined')	// this only happens if triggers are missed
 	{
 		Exceptions.chatAnsweredNotInList++;
-		return;
+		processStartedChat(chat);
 	}
 	
 	AllChats[chat.ChatID].answered = new Date(chat.Answered);
@@ -653,6 +633,9 @@ function processAnsweredChat(chat) {
 	
 	Overall.tcan++;	// answered chats
 	deptobj.tcan++;
+	
+	opobj = Operators[chat.OperatorID];
+	if(typeof(opobj) === 'undefined') return false;		// an operator that doesnt exist (may happen if created midday)
 	opobj.tcan++;
 
 	opobj.activeChats.push(chat.ChatID);
@@ -664,6 +647,7 @@ function processAnsweredChat(chat) {
 		deptobj.csla++;
 		opobj.csla++;
 	}
+	return true;
 }
 
 // process closed chat object. closed chat is one that is started and answered.
@@ -672,35 +656,27 @@ function processClosedChat(chat) {
 	var deptobj,opobj;
 
 	deptobj = Departments[chat.DepartmentID];
-	if(typeof(deptobj) === 'undefined') return;		// a dept we are not interested in
+	if(typeof(deptobj) === 'undefined') return false;		// a dept we are not interested in
 
-	if(chat.Ended == null || chat.Ended == "")		// should not happen
-	{
-		Exceptions.chatEndedIsBlank++;
-		return;
-	}
-	if(chat.Closed == null || chat.Closed == "")	// should not happen
-	{
-		Exceptions.chatClosedIsBlank++;
-		return;
-	}
-	if(typeof(AllChats[chat.ChatID]) === 'undefined')	// if this chat did not exist (only happens if missed it during startup)
+	if(typeof(AllChats[chat.ChatID]) === 'undefined')	// this only happens if triggers are missed
 	{
 		Exceptions.chatClosedNotInList++;
-		return;
+		processStartedChat(chat);
+		if(chat.Answered !== "" && chat.Answered !== null)
+		{
+			processAnsweredChat(chat);
+		}
 	}
 		
 	AllChats[chat.ChatID].status = 0;		// inactive/complete/cancelled/closed
 	AllChats[chat.ChatID].ended = new Date(chat.Ended);
 	AllChats[chat.ChatID].closed = new Date(chat.Closed);
-	deptobj.tcc++;
 
 	if(chat.OperatorID != "" && chat.OperatorID != null)
 	{
 		opobj = Operators[chat.OperatorID];
-		if(typeof(opobj) === 'undefined') return;		// an operator that doesnt exist (may happen if created during startup)
+		if(typeof(opobj) === 'undefined') return false;	// shouldnt happen
 		// add the total chat time for this chat
-	//	sendToLogs("TCT by minute is "+(opobj.tct+opobj.mct)+", TCT by calc is "+opobj.tcta);
 		var chattime = Math.round((AllChats[chat.ChatID].closed - AllChats[chat.ChatID].started)/1000);
 		opobj.tcta = opobj.tcta + chattime;
 		// now remove from active chat list and update stats
@@ -711,53 +687,58 @@ function processClosedChat(chat) {
 
 		updateCconc(AllChats[chat.ChatID]);	// update chat conc now that it is closed
 	}
+	return true;
 }
 
 // process window closed chat object. This happens if visitor closes chat by closing the window
 function processWindowClosed(chat) {
 	var deptobj,opobj;
 
+	deptobj = Departments[chat.DepartmentID];
+	if(typeof(deptobj) === 'undefined') return false;		// a dept we are not interested in	
+	
 	if(chat.ChatStatusType == 1)		// abandoned (closed during pre chat form) chats
 	{
 		Exceptions.chatsAbandoned++;
 		Overall.tcaban++;
-		return;
+		return false;
 	}
-
-	deptobj = Departments[chat.DepartmentID];
-	if(typeof(deptobj) === 'undefined') return;		// a dept we are not interested in
-	
 	if(chat.ChatStatusType == 10 || chat.ChatStatusType == 18)		// blocked chats
 	{
 		Exceptions.chatsBlocked++;
 	}
-	else if(chat.ChatStatusType >= 7 && chat.ChatStatusType <= 15)		// unavailable chat
+	
+	if(chat.ChatStatusType == 7 || chat.ChatStatusType == 8 || (chat.ChatStatusType >= 11 && chat.ChatStatusType <= 15))	// unavailable chat 7, 8, 11, 12, 13, 14 or 15 
 	{
 		Overall.tcun++;
 		deptobj.tcun++;
-	}
-	
-	if(typeof(AllChats[chat.ChatID]) === 'undefined')		// abandoned and available chats not in list
-		return;
-	
-	if(AllChats[chat.ChatID].answered == 0 && AllChats[chat.ChatID].started != 0)		// chat started but unanswered
+	}	
+	else if(typeof(AllChats[chat.ChatID]) !== 'undefined')
 	{
-		if(chat.OperatorID == 0 || chat.OperatorID == null)	// operator unassigned
+		if(AllChats[chat.ChatID].answered == 0 && AllChats[chat.ChatID].started != 0)		// chat started but unanswered
 		{
-			Overall.tcuq++;
-			deptobj.tcuq++;
-		}
-		else
-		{
-			Overall.tcua++;
-			deptobj.tcua++;			
+			if(chat.OperatorID == 0 || chat.OperatorID == null)	// operator unassigned
+			{
+				Overall.tcuq++;
+				deptobj.tcuq++;
+			}
+			else
+			{
+				Overall.tcua++;
+				deptobj.tcua++;			
+			}
 		}
 	}
+	
+	if(typeof(AllChats[chat.ChatID]) === 'undefined')		// chats not started are not in list
+		return false;
 
 	AllChats[chat.ChatID].status = 0;		// inactive/complete/cancelled/closed
+	AllChats[chat.ChatID].statustype = chat.ChatStatusType;		
 	AllChats[chat.ChatID].ended = new Date(chat.Ended);
 	AllChats[chat.ChatID].closed = new Date(chat.Closed);
 	updateCSAT(chat);
+	return true;
 }
 
 // process operator status changed. or unavailable
@@ -767,12 +748,12 @@ function processOperatorStatusChanged(ostatus) {
 	if(typeof(Operators[opid]) === 'undefined')
 	{
 		Exceptions.operatorIDUndefined++;
-		return;
+		return false;
 	}
 
 	var depts = new Array();
 	depts = OperatorDepts[opid];
-	if(typeof(depts) === 'undefined') return;	// operator depts not recognised
+	if(typeof(depts) === 'undefined') return false;	// operator depts not recognised
 
 	var oldstatus = Operators[opid].status	// save old status for later processing
 	// Get the custom status via async API call as currently not available in the trigger
@@ -839,79 +820,7 @@ function processOperatorStatusChanged(ostatus) {
 			}
 		}
 	}
-}
-// this trigger is fired when the chat-reassigned event occcurs
-/*function processChatReassigned(chat) {
-	
-	var tchat = AllChats[chat.ChatID] || 0; // chat could have been triggered by ACD before chat answered
-	if(!tchat)
-		return(console.log("Tchat undefined"));
-	
-	if(tchat.answered == 0)
-		return(console.log("Not yet answered"));
-	
-	var reassign = new Ra();
-	removeActiveChat(Operators[tchat.operatorID], chat.ChatID);		// remove from previous operator
-	Operators[tchat.operatorID].tcan--;
-	Operators[chat.OperatorID].activeChats.push(chat.ChatID);		// add to new operator
-	Operators[chat.OperatorID].tcan++;
-	reassign.started = tchat.started;
-	reassign.operatorID = tchat.operatorID;
-	reassign.departmentID = tchat.departmentID;
-	reassign.ended = TimeNow;
-	tchat.operatorID = chat.OperatorID;
-	tchat.departmentID = chat.DepartmentID;
-	
-	var ra = ChatsReassigned[chat.ChatID];
-	if(typeof ra !== 'undefined')
-	{
-		ra.reassignments.push(reassign);
-	}
-	else
-	{
-		var cr = new Reassigns();
-		cr.chatID = chat.ChatID;
-		cr.reassignments = new Array(reassign);
-		ChatsReassigned[chat.ChatID] = cr;		
-	}
-	console.log("Chat reassignment saved");
-}*/
-
-function processChatReassigned(chat) {
-	var numra
-	
-	if(chat.Answered == "")
-		return(console.log("Not yet answered"));
-	
-	var reas = ChatsReassigned[chat.ChatID];
-	if(typeof reas === 'undefined')	// first reassignment so save previous operator
-	{
-		var ra = new Ra();
-		ra.started = chat.Started;
-		ra.operatorID = chat.LastAssignedByOperatorID;
-		ra.departmentID = chat.DepartmentID;
-		ra.ended = TimeNow;
-		reassign = new Reassigns();
-		reassign.chatID = chat.ChatID;
-		reassign.reassignments = new Array(ra);
-		ChatsReassigned[chat.ChatID] = reassign;
-	}
-	if((numra=ChatsReassigned[chat.ChatID].reassignments.length) > 1)	// not the first reassignment
-	{
-		var previousra = reassign.reassignments[numra-1];
-		previousra.ended = TimeNow;
-	}	
-	
-	// now add the new reassignment
-	var ra2 = new Ra();
-	ra2.started = TimeNow;
-	ra2.operatorID = chat.OperatorID;
-	ra2.departmentID = chat.DepartmentID;
-	ra2.ended = 0;
-	ChatsReassigned[chat.ChatID].reassignments.push(ra2);
-	console.log("Chat reassignment saved");
-	debugLog("Chats reassigned1: ",ChatsReassigned[chat.ChatID].reassignments[0]);
-	debugLog("Chats reassigned2: ",ChatsReassigned[chat.ChatID].reassignments[1]);
+	return true;
 }
 
 function updateCconc(tchat) {
@@ -934,25 +843,21 @@ function updateCconc(tchat) {
 
 function updateCSAT(chat) {
 	var chatobj = AllChats[chat.ChatID];
-	chatobj.csat.OSAT = chat.rateadvisor || null;
-	chatobj.csat.NPS = chat.NPS || null;
+	if(typeof chatobj === 'undefined') return false;
+	chatobj.csat.OSAT = Number(chat.rateadvisor) || null;
+	chatobj.csat.NPS = Number(chat.NPS) || null;
 	var ft = chat.firsttime || null;
 	var resolved = chat.resolved || null;
 //	debugLog("Chat fields", chat);
 	if(chatobj.csat.NPS == null && chatobj.csat.OSAT == null && ft == null && resolved == null)
 	{
-		console.log("Csat is null");
-		return;
+		Exceptions.noCsatInfo++;
+		return false;
 	}
 	// update dept and operator stats
-	if(ft == "Yes" && resolved == "Yes")
-		chatobj.csat.FCR = 1;
-	else
-		chatobj.csat.FCR = 0;
-	if(resolved == "Yes")
-		chatobj.csat.Resolved = 1;
-	else
-		chatobj.csat.Resolved = 0;
+	chatobj.csat.FCR = (ft == "Yes" && resolved == "Yes") ? 1 : 0;
+	chatobj.csat.Resolved = (resolved == "Yes") ? 1 : 0;
+	
 	var opobj = Operators[chat.OperatorID];
 	var deptobj = Departments[chat.DepartmentID];
 	if(typeof(opobj) === 'undefined' || typeof(deptobj) === 'undefined') return;
@@ -969,7 +874,8 @@ function updateCSAT(chat) {
 	opobj.csat.FCR = ((opobj.csat.FCR*numo) + chatobj.csat.FCR)/opobj.csat.surveys;
 	opobj.csat.Resolved = ((opobj.csat.Resolved*numo) + chatobj.csat.Resolved)/opobj.csat.surveys;
 	
-	console.log("CSAT updated");
+//	console.log("CSAT updated");
+	return true;
 }
 
 function removeActiveChat(opobj, chatid) {
@@ -1016,10 +922,13 @@ function calculateACT_CPH() {
 		if(tchat.status == 0 && tchat.ended != 0 && tchat.answered != 0)		// chat ended
 		{
 			count++;
+			if(tchat.departmentID == 0 || tchat.skillgroup == 0)	// shouldnt be
+				continue;
 			sgid = Departments[tchat.departmentID].skillgroup;
 			dcount[tchat.departmentID]++;
 			sgcount[sgid]++; 
 			ctime = tchat.ended - tchat.answered;
+			if(isNaN(ctime)) continue;
 			ochattime = ochattime + ctime;
 			dchattime[tchat.departmentID] = dchattime[tchat.departmentID] + ctime;	
 			sgchattime[sgid] = sgchattime[sgid] + ctime;	
@@ -1027,7 +936,8 @@ function calculateACT_CPH() {
 			{
 				cph++;
 				dcph[tchat.departmentID]++;
-				Operators[tchat.operatorID].cph++;
+				if(tchat.operatorID)		// make sure operator id is not missing
+					Operators[tchat.operatorID].cph++;
 			}
 		}
 	}
@@ -1042,6 +952,7 @@ function calculateACT_CPH() {
 			
 		Departments[i].cph = dcph[i];
 	}
+	
 }
 
 function calculateASA_SLA() {
@@ -1050,10 +961,6 @@ function calculateASA_SLA() {
 	var danstime = new Object();
 	var dcount = new Object();
 	var dtac = new Object();
-	var sganstime = new Object();
-	var sgcount = new Object();
-	var sgtac = new Object();
-
 	for(var i in Departments)
 	{
 		Departments[i].asa = 0;
@@ -1061,9 +968,6 @@ function calculateASA_SLA() {
 		dcount[i] = 0;
 		danstime[i] = 0;
 		dtac[i] = 0;
-		sgcount[Departments[i].skillgroup] = 0;
-		sganstime[Departments[i].skillgroup] = 0;
-		sgtac[Departments[i].skillgroup] = 0;
 	}
 	
 	for(var i in AllChats)
@@ -1072,9 +976,13 @@ function calculateASA_SLA() {
 		if((tchat.status == 2 || tchat.status == 0) && tchat.answered != 0 && tchat.started != 0)
 		{
 			count++;
+			if(tchat.departmentID == 0 || tchat.skillgroup == 0)	// shouldnt be
+				continue;
+				
 			dcount[tchat.departmentID]++;
 			sgcount[tchat.skillgroup]++;
-			speed = tchat.answered - tchat.started;				
+			speed = tchat.answered - tchat.started;
+			if(isNaN(speed)) continue;
 			anstime = anstime + speed;
 			danstime[tchat.departmentID] = danstime[tchat.departmentID] + speed;
 			sganstime[tchat.skillgroup] = sganstime[tchat.skillgroup] + speed;
@@ -1114,7 +1022,6 @@ function calculateLWT_CIQ() {
 	for(var i in AllChats)
 	{
 		tchat = AllChats[i];
-//		if(tchat.status == 1 && tchat.answered == 0 && tchat.started != 0 && tchat.ended == 0)		// chat not answered yet
 		if(tchat.status == 1)		// chat not answered yet
 		{
 			Overall.ciq++;
@@ -1132,7 +1039,7 @@ function calculateLWT_CIQ() {
 	Overall.lwt = maxwait;
 }
 
-//use operators by dept to calc chat concurrency and available chat capacity
+//use operators by dept to calc chat concurrency and available chat capacity and total chats offered
 function calculateACC_CCONC_TCO() {
 	var depts = new Array();
 	var opobj, sgid;
@@ -1164,10 +1071,7 @@ function calculateACC_CCONC_TCO() {
 			opobj.cconc = ((opobj.tct+opobj.mct)/opobj.tct).toFixed(2);
 		
 		if(opobj.statusdtime != 0)
-		{
 			opobj.tcs = Math.round(((TimeNow - opobj.statusdtime))/1000);
-//			sendToLogs("Operator:status:tcs="+opobj.name+":"+opobj.status+":"+Math.round(((TimeNow - opobj.statusdtime))/1000));
-		}
 		else
 			opobj.tcs = 0;
 		
@@ -1176,7 +1080,7 @@ function calculateACC_CCONC_TCO() {
 		sgid = OperatorSkills[i];
 		if(opobj.status == 2)		// make sure operator is available
 		{
-			opobj.acc = opobj.ccap - opobj.activeChats.length;
+			opobj.acc = opobj.maxcc - opobj.activeChats.length;
 			if(opobj.acc < 0) opobj.acc = 0;			// make sure not negative
 			Overall.acc = Overall.acc + opobj.acc;
 		}
@@ -1205,59 +1109,51 @@ function calculateACC_CCONC_TCO() {
 }
 
 // this function calls API again if data is truncated
-function loadNext(method, next, callback) {
+function loadNext(method,next,callback,params) {
 	var str = [];
 	for(var key in next) {
 		if (next.hasOwnProperty(key)) {
 			str.push(encodeURIComponent(key) + "=" + encodeURIComponent(next[key]));
 		}
 	}
-	getApiData(method, str.join("&"), callback);
+	getApiData(method,str.join("&"),callback,params);
 }
 
 // calls extraction API and receives JSON objects 
-function getApiData(method, params, fcallback, cbparam) {
-	ApiDataNotReady++;		// flag to track api calls
-	
-	BC_API_Request(method, params, function (response) {
-		var str = '';
-		//another chunk of data has been received, so append it to `str`
-		response.on('data', function (chunk) {
-			str += chunk;
-		});
-		//the whole response has been received, take final action.
-		response.on('end', function () {
-			ApiDataNotReady--;
-			var jsonObj;
-			try {
-				jsonObj = JSON.parse(str);
-			}
-			catch (e){
-				console.log("API or JSON error");
-				return;
-			}
-			var data = new Array();
-			var next = jsonObj.Next;
-			data = jsonObj.Data;
-			if(data === 'undefined' || data == null)
-			{
-				console.log("No API data returned: "+str);
-				sendToLogs("No API data returned: "+str);
-				return;		// exit out if error json message received
-			}
-			fcallback(data, cbparam);
+function getApiData(method,params,fcallback,cbparam) {
+	var emsg;
+	BC_API_Request(method,params,function(str)
+	{
+		var jsonObj;
+		try
+		{
+			jsonObj = JSON.parse(str);
+		} 
+		catch (e) 
+		{
+			Exceptions.APIDataError++;
+			emsg = TimeNow+ ": API did not return JSON message: "+str;
+			console.log(emsg);
+			sendToLogs(emsg);
+			return;
+		}
+		var data = new Array();
+		data = jsonObj.Data;
+		if(data === 'undefined' || data == null)
+		{
+			Exceptions.jsonDataError++;
+			emsg = TimeNow+ ":"+method+": No data: "+str;
+			console.log(emsg);
+			sendToLogs(emsg);
+			return;
+		}
+		fcallback(data, cbparam);
 
-			if(typeof next !== 'undefined') 
-			{
-				loadNext(method, next, fcallback);
-			}
-		});
-		// in case there is a html error
-		response.on('error', function(err) {
-			// handle errors with the request itself
-			console.error("Error with the request: ", err.message);
-			ApiDataNotReady--;
-		});
+		var next = jsonObj.Next;
+		if(typeof next !== 'undefined') 
+		{
+			loadNext(method,next,fcallback,cbparam);
+		}
 	});
 }
 
@@ -1302,7 +1198,7 @@ function calculateOperatorConc() {
 
 // gets operator availability info 
 function getOperatorAvailabilityData() {
-	if(ApiDataNotReady || OperatorsSetupComplete === false)
+	if(!OperatorsSetupComplete)
 	{
 		console.log("Static data not ready (OA): "+ApiDataNotReady);
 		setTimeout(getOperatorAvailabilityData, 2000);
@@ -1314,7 +1210,7 @@ function getOperatorAvailabilityData() {
 
 // gets current active chats 
 function getActiveChatData() {
-	if(ApiDataNotReady || OperatorsSetupComplete === false)
+	if(!OperatorsSetupComplete)
 	{
 		console.log("Static data not ready (AC): "+ApiDataNotReady);
 		setTimeout(getActiveChatData, 1000);
@@ -1325,7 +1221,7 @@ function getActiveChatData() {
 	{
 		parameters = "DepartmentID="+did;
 		getApiData("getActiveChats",parameters,allActiveChats);
-		sleep(500);
+		sleep(100);
 	}
 }
 
@@ -1365,9 +1261,48 @@ function allActiveChats(chats) {
 	{
 		if(chats[i].Started !== "" && chats[i].Started !== null)
 		{
-			processStartedChat(chats[i]);	// started, waiting to be answered
+			if(processStartedChat(chats[i]))	// started, waiting to be answered
+			{
+				if(chats[i].Answered !== "" && chats[i].Answered !== null)
+					processAnsweredChat(chats[i]);	// chat was answered
+			}
+		}
+	}
+}
+
+// process all active chat objects 
+function refreshActiveChatsTimer() {
+	if(!OperatorsSetupComplete)
+	{
+		setTimeout(refreshActiveChatsTimer, 60000);
+		return;
+	}
+	
+	for(var did in Departments)	// active chats are by department
+	{
+		parameters = "DepartmentID="+did;
+		getApiData("getActiveChats",parameters,refreshActiveChats);
+		ApiDataNotReady--;	// do not count this API request
+		sleep(100);
+	}
+	
+	setTimeout(refreshActiveChatsTimer, 60000);
+}
+
+// refresh all active chat objects. This isdone every minute in case triggers are missed
+function refreshActiveChats(chats) {
+	for(var i in chats)
+	{
+		if(typeof(AllChats[chats[i].ChatID]) !== 'undefined')
+		{
 			if(chats[i].Answered !== "" && chats[i].Answered !== null)
-				processAnsweredChat(chats[i]);	// chat was answered
+			{
+				if(AllChats[chats[i].ChatID].status == 1)	// if chat was waiting to be answered
+				{
+					processAnsweredChat(chats[i]);
+					Exceptions.refreshedAnsweredChat++;
+				}
+			}
 		}
 	}
 }
@@ -1378,33 +1313,39 @@ function allInactiveChats(chats) {
 	{
 		if(chats[i].Started !== "" && chats[i].Started !== null)
 		{
-			processStartedChat(chats[i]);	// started
-			if(chats[i].Answered !== "" && chats[i].Answered !== null)
+			if(processStartedChat(chats[i]))	// started
 			{
-				processAnsweredChat(chats[i]);	//  answered
-				processClosedChat(chats[i]);	// and closed
-				if(Object.keys(chats[i].CustomFields).length > 0)
+				if(chats[i].Answered !== "" && chats[i].Answered !== null)
 				{
-					var chat = chats[i];
-					chat.NPS = chat.CustomFields.NPS || null;
-					chat.rateadvisor = chat.CustomFields.rateadvisor || null;
-					chat.firsttime = chat.CustomFields.firsttime || null;
-					chat.resolved = chat.CustomFields.resolved || null;
-					delete chat["CustomFields"];
-					updateCSAT(chats[i]);
+					if(processAnsweredChat(chats[i]))	//  answered
+					{
+						if(processClosedChat(chats[i]))	// and closed
+						{
+							if(Object.keys(chats[i].CustomFields).length > 0)
+							{
+								var chat = chats[i];
+								chat.NPS = chat.CustomFields.NPS || null;
+								chat.rateadvisor = chat.CustomFields.rateadvisor || null;
+								chat.firsttime = chat.CustomFields.firsttime || null;
+								chat.resolved = chat.CustomFields.resolved || null;
+								delete chat["CustomFields"];
+								updateCSAT(chats[i]);
+							}
+						}
+					}
 				}
+				else
+					processWindowClosed(chats[i]);	// closed after starting before being answered
 			}
-			else
-				processWindowClosed(chats[i]);	// closed after starting before being answered
 		}
 		else
-			processWindowClosed(chats[i]);	// closed because unavailable
+			processWindowClosed(chats[i]);	// closed because unavailable or abandoned
 	}
 }
 
 // gets today's chat data incase system was started during the day
 function getInactiveChatData() {
-	if(ApiDataNotReady > 0 || OperatorsSetupComplete === false)
+	if(!OperatorsSetupComplete)
 	{
 		console.log("Static data not ready (IC): "+ApiDataNotReady);
 		setTimeout(getInactiveChatData, 1000);
@@ -1413,16 +1354,15 @@ function getInactiveChatData() {
 
 	// set date to start of today. Search seems to work by looking at closed time i.e. everything that closed after
 	// "FromDate" will be included even if the created datetime is before the FromDate.
-	var startDate = new Date();
-	startDate.setUTCHours(0,0,0,0);
-
+//	startDate.setHours(startDate.getHours() - TOFFSET);	// allow for TIMEZONE
 	console.log("Getting inactive chat info from "+ Object.keys(Folders).length +" folders");
+	console.log("Start Date: "+ StartOfDay.toISOString());
 	var parameters;
 	for(var fid in Folders)	// Inactive chats are by folders
 	{
-		parameters = "FolderID="+fid+"&FromDate="+startDate.toISOString();
+		parameters = "FolderID="+fid+"&FromDate="+StartOfDay.toISOString();
 		getApiData("getInactiveChats", parameters, allInactiveChats);
-		sleep(500);
+		sleep(200);
 	}	
 }
 
@@ -1463,46 +1403,31 @@ function getCsvChatData() {
 	return(csvChats);	
 }
 
-function getChatTransferData() {	
-	var key, value, index;
-	var chatTransData = "";
-	var tchat = new Object();
-	var ra = new Object();
-	var cra = new Array();
-	chatTransData = "Chat ID,Started,Operator,Department,Ended\r\n";
-	// now add the data
-	for(var j in ChatsReassigned)	// iterate through objects
-	{
-		tchat = ChatsReassigned[j];
-		chatTransData = chatTransData + "\"=\"\"" + tchat.chatID + "\"\"\",";
-		cra = tchat.reassignments;
-		for(var i=0; i < cra.length; i++) // iterate through array
-		{
-			ra = cra[i];
-			for(key in ra)
-			{
-				index = ra[key] || 0;
-				if(key === "departmentID" && index != 0)
-					value = Departments[index].name;
-				else if(key === "operatorID" && index != 0)
-					value = Operators[index].name;
-				else if(!isNaN(index))
-					value = "\"=\"\"" + index + "\"\"\"";
-				else
-					value = index;
-				
-				chatTransData = chatTransData +value+ ",";
-			}
-		}
-		chatTransData = chatTransData + "\r\n";
-	}
-	return(chatTransData);	
-}
-
 // Set up socket actions and responses
 io.on('connection', function(socket){
 	
-//	LoggedInUsers.push(socket.id);		// save the socket id so that updates can be sent
+	//  authenticate user name and password
+	socket.on('authenticate', function(user){
+		console.log("authentication request received for: "+user.name);
+		sendToLogs("authentication request received for: "+user.name);
+		if(typeof(AuthUsers[user.name]) === 'undefined')
+		{
+			socket.emit('authErrorResponse',"Username not valid");
+		}
+		else if(AuthUsers[user.name] != user.pwd)
+		{
+			socket.emit('authErrorResponse',"Password not valid");
+		}
+		else
+		{
+//			console.log("Save socket "+socket.id);
+			LoggedInUsers.push(socket.id);		// save the socket id so that updates can be sent
+			UsersLoggedIn[socket.id] = user.name;	// save the user name for monitoring purposes
+			io.sockets.sockets[user.name] = socket.id;
+			socket.emit('authResponse',{name: user.name, pwd: user.pwd});
+			sendToLogs("authentication successful: "+user.name);
+		}
+	});	
 	
 	socket.on('disconnect', function(data){
 		removeSocket(socket.id, "disconnect");
@@ -1521,12 +1446,6 @@ io.on('connection', function(socket){
 		sendToLogs("Download chats requested");
 		var csvdata = getCsvChatData();
 		socket.emit('chatsCsvResponse',csvdata);	
-	});
-	socket.on('downloadChatTransfers', function(data){
-		console.log("Download Chats Transfer requested");
-		sendToLogs("Download chats Transfer requested");
-		var chattransferdata = getChatTransferData();
-		socket.emit('chatTransferResponse',chattransferdata);
 	});	
 	socket.on('authenticate', function(data){
 		console.log("authentication request received for: "+data.email);
@@ -1586,14 +1505,15 @@ function removeSocket(id, evname) {
 function updateChatStats() {
 	var socketid;
 	
+	if(!OperatorsSetupComplete) return;		//try again later
+
 	TimeNow = new Date();		// update the time for all calculations
 	if(TimeNow > EndOfDay)		// we have skipped to a new day
 	{
-		console.log("New day started, stats reset");
+		console.log(TimeNow.toISOString()+": New day started, stats reset");
 		var csvdata = getCsvChatData();
 //		postToArchive(csvdata);
 		doStartOfDay();
-		setTimeout(updateChatStats, 8000);
 		return;
 	}
 	calculateLWT_CIQ();
@@ -1601,9 +1521,9 @@ function updateChatStats() {
 	calculateACT_CPH();
 	calculateACC_CCONC_TCO();
 
-	var str = "Total chats started today: "+Object.keys(AllChats).length;
+	var str = TimeNow.toISOString()+": Chats started today: "+Object.keys(AllChats).length;
+//	str = str + "\r\nClients connected: "+io.eio.clientsCount;	// useful for debuging socket.io errors
 	console.log(str);
-	console.log("Clients connected: "+io.eio.clientsCount);
 	for(var i in LoggedInUsers)
 	{
 		socketid = LoggedInUsers[i];
@@ -1614,20 +1534,20 @@ function updateChatStats() {
 		io.to(socketid).emit('consoleLogs',str);
 		io.to(socketid).emit('exceptions',Exceptions);
 	}
-	setTimeout(updateChatStats, 2000);	// send update every 2 second
+//	setTimeout(updateChatStats, 2000);	// send update every 2 second
 }
 
 // setup all globals
 function doStartOfDay() {
 	initialiseGlobals();	// zero all memory
 	getApiData("getDepartments", 0, deptsCallback);
-	sleep(1000);
+	sleep(100);
 	getApiData("getOperators", 0, operatorsCallback);
-	sleep(1000);
+	sleep(100);
 	getApiData("getFolders", "FolderType=5", foldersCallback);	// get only chat folders
-	sleep(1000);
+	sleep(100);
 	getApiData("getCustomOperatorStatuses", 0, customStatusCallback);
-	sleep(1000);
+	sleep(100);
 	setUpDeptAndSkillGroups();
 	getInactiveChatData();
 	getActiveChatData();
@@ -1644,5 +1564,6 @@ function checkOperatorAvailability() {
 }
 console.log("Server started on port "+PORT);
 doStartOfDay();		// initialise everything
-setTimeout(updateChatStats,8000);	// updates socket io data at infinitum
+setInterval(updateChatStats,3000);	// updates socket io data at infinitum
+setTimeout(refreshActiveChatsTimer, 60000);	
 
