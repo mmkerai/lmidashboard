@@ -101,7 +101,7 @@ function initGSignin() {
 //    gapi.load('auth2', function() {
 //        gapi.auth2.init("{'scope': 'profile'}");
 //    });
-	$('#rtaversion').text("Bold Dashboard v1.0");
+	$('#rtaversion').text("Bold Dashboard v1.1");
 	checksignedin(gauth2);
 }
 	

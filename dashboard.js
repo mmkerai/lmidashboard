@@ -47,6 +47,8 @@ $(document).ready(function() {
 		$("#error").text("");
 		console.log("User successfully signed in");
 	});
+});
+
 $(window).on('beforeunload',function () {
 	socket.close();
 });
