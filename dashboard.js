@@ -1,5 +1,8 @@
-var Overall = new Object();
-var SkillGroups = new Array();
+var socket = io('', {
+	'reconnection': true,
+    'reconnectionDelay': 1000,
+    'reconnectionAttempts': 50
+});
 
 $(document).ready(function() {
 
@@ -8,8 +11,8 @@ $(document).ready(function() {
 	$("#export").hide();
 	$('#download').hide();
 
-	socket.on('connection', function(socket){		
-		console.log("Socket connected");
+	socket.on('connection', function(data){
+		console.log("socket connected at "+ new Date().toGMTString());
 	});
 	socket.on('error', function(data){
 		console.log("socket error at "+ new Date().toGMTString());
@@ -25,7 +28,6 @@ $(document).ready(function() {
 	});	
 	socket.on('overallStats', function(data) {		
 		$("#ctime").text("Last refreshed: "+new Date().toLocaleString());
-//		Overall = data;
 		showTopLevelStats(data);
 	});		
 	socket.on('departmentStats', function(ddata){
@@ -45,12 +47,10 @@ $(document).ready(function() {
 		$("#error").text("");
 		console.log("User successfully signed in");
 	});
+$(window).on('beforeunload',function () {
+	socket.close();
 });
-
-function showDepartment(did,dname) {
-	window.open("department.html?did="+did, '_blank');
-}
-
+	
 function exportMetrics() {
 	console.log("Exporting top-level metrics");
 	tableToCsvFile("topTable");

@@ -1,10 +1,10 @@
 // utilities for use in dashboard 
-var socket = new io.connect();
+
 var ChatStatus = ["Logged Out","Away","Available"];
 var GOOGLE_CLIENT_ID="817020760023-41aoervnm8ntf76poubf8nq57lp9ek7f.apps.googleusercontent.com";
 var csvfile = null;
 var googleUser;
-
+var RTAVersion = "Dashboard v1.09";
 
 function readCookie(name)
 {
@@ -162,7 +162,8 @@ function showOperatorStats(data) {
 	rowid = document.getElementById(data.name);
 	if(rowid === null)		// row doesnt exist so create one
 	{
-		rowid = createOperatorRow(ttable, data.oid, data.name);
+		var id = data.oid || data.did;
+		rowid = createOperatorRow(ttable, id, data.name);
 	}
 	showOperatorMetrics(rowid,data);
 }
@@ -264,13 +265,28 @@ function showTopMetrics(rowid, data) {
 
 function showOperatorMetrics(rowid, data) {
 	var act = 0;
-	if(data.tct > 0)
+	if(data.tcan > 0)
 		act = Math.round(data.tct/data.tcan);
 	
-	rowid.cells[1].innerHTML = ChatStatus[data.status]+":"+data.cstatus;
-	rowid.cells[2].innerHTML = toHHMMSS(data.tcs);
-	rowid.cells[3].innerHTML = data.ccap;
-	rowid.cells[4].innerHTML = data.activeChats.length;
+	if(typeof(data.did) !== 'undefined')	// this is for a dept not operator
+	{
+		st = "N/A";
+		tcs = "N/A";
+		mcc = "N/A";
+		ac = data.tac;
+	}
+	else
+	{
+		st = ChatStatus[data.status]+":"+data.cstatus;
+		tcs = toHHMMSS(data.tcs);
+		mcc = data.maxcc;
+		ac = data.activeChats.length;
+	}
+	
+	rowid.cells[1].innerHTML = st;
+	rowid.cells[2].innerHTML = tcs;
+	rowid.cells[3].innerHTML = mcc;
+	rowid.cells[4].innerHTML = ac;
 	rowid.cells[5].innerHTML = data.acc;
 	rowid.cells[6].innerHTML = data.tcan;
 	rowid.cells[7].innerHTML = data.cph;	
@@ -279,19 +295,15 @@ function showOperatorMetrics(rowid, data) {
 }
 
 function showCsatMetrics(rowid, data) {
-	var fcr = Math.round(data.csat.FCR*100) + "%";
-	var resolved = Math.round(data.csat.Resolved*100) + "%";
+	var tc = data.tcc || data.tcan-data.tac;	// tcc in operator object only not in dept or skillgroup object
+	if(isNaN(tc)) tc=0;
 	
-	rowid.cells[1].innerHTML = data.tcc;
+	rowid.cells[1].innerHTML = tc;	// answered - active is closed chats
 	rowid.cells[2].innerHTML = data.csat.surveys;
-	rowid.cells[3].innerHTML = fcr;
-	rowid.cells[4].innerHTML = resolved;
-	rowid.cells[5].innerHTML = Math.round(data.csat.OSAT);
-	rowid.cells[6].innerHTML = Math.round(data.csat.NPS);
-}
-
-function showDeptCsat(did,dname) {
-	window.open("csat.html?did="+did, '_blank');
+	rowid.cells[3].innerHTML = Math.round(data.csat.FCR*100) + "%";
+	rowid.cells[4].innerHTML = Math.round(data.csat.Resolved*100) + "%";
+	rowid.cells[5].innerHTML = Math.round(data.csat.OSAT*10) + "%";
+	rowid.cells[6].innerHTML = Math.round(data.csat.NPS*10) + "%";
 }
 
 /* build csvfile from table to export snapshot
