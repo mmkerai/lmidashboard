@@ -49,6 +49,10 @@ $(document).ready(function() {
 	});
 });
 
+function showDepartment(did,dname) {
+	window.open("department.html?did="+did, '_blank');
+}
+
 $(window).on('beforeunload',function () {
 	socket.close();
 });

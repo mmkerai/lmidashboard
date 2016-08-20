@@ -1273,20 +1273,15 @@ function allActiveChats(chats) {
 // process all active chat objects 
 function refreshActiveChatsTimer() {
 	if(!OperatorsSetupComplete)
-	{
-		setTimeout(refreshActiveChatsTimer, 60000);
 		return;
-	}
 	
 	for(var did in Departments)	// active chats are by department
 	{
 		parameters = "DepartmentID="+did;
 		getApiData("getActiveChats",parameters,refreshActiveChats);
 		ApiDataNotReady--;	// do not count this API request
-		sleep(100);
+		sleep(1000);
 	}
-	
-	setTimeout(refreshActiveChatsTimer, 60000);
 }
 
 // refresh all active chat objects. This isdone every minute in case triggers are missed
@@ -1542,5 +1537,5 @@ function checkOperatorAvailability() {
 console.log("Server started on port "+PORT);
 doStartOfDay();		// initialise everything
 setInterval(updateChatStats,3000);	// updates socket io data at infinitum
-setTimeout(refreshActiveChatsTimer, 60000);	
+setInterval(refreshActiveChatsTimer, 60000);	
 
