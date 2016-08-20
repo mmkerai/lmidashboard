@@ -1,4 +1,10 @@
-var did;
+var socket = io('', {
+	'reconnection': true,
+    'reconnectionDelay': 1000,
+    'reconnectionAttempts': 50
+});
+
+var did,oid;
 var DeptOperators = new Array();
 var Operators = new Array();
 
