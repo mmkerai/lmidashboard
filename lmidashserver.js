@@ -1406,29 +1406,6 @@ function getCsvChatData() {
 // Set up socket actions and responses
 io.on('connection', function(socket){
 	
-	//  authenticate user name and password
-	socket.on('authenticate', function(user){
-		console.log("authentication request received for: "+user.name);
-		sendToLogs("authentication request received for: "+user.name);
-		if(typeof(AuthUsers[user.name]) === 'undefined')
-		{
-			socket.emit('authErrorResponse',"Username not valid");
-		}
-		else if(AuthUsers[user.name] != user.pwd)
-		{
-			socket.emit('authErrorResponse',"Password not valid");
-		}
-		else
-		{
-//			console.log("Save socket "+socket.id);
-			LoggedInUsers.push(socket.id);		// save the socket id so that updates can be sent
-			UsersLoggedIn[socket.id] = user.name;	// save the user name for monitoring purposes
-			io.sockets.sockets[user.name] = socket.id;
-			socket.emit('authResponse',{name: user.name, pwd: user.pwd});
-			sendToLogs("authentication successful: "+user.name);
-		}
-	});	
-	
 	socket.on('disconnect', function(data){
 		removeSocket(socket.id, "disconnect");
 	});	
