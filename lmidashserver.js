@@ -29,6 +29,8 @@
 var http = require('http');
 var https = require('https');
 var app = require('express')();
+var	server = http.createServer(app);
+var	io = require('socket.io').listen(server);
 var fs = require('fs');
 var crypto = require('crypto');
 var bodyParser = require('body-parser');
@@ -47,8 +49,8 @@ const options = {
 */
 var PORT = Number(process.env.PORT || 80);
 //var server = https.createServer(options, app).listen(PORT);
-var server = http.createServer(app).listen(PORT);
-var	io = require('socket.io').listen(server);
+server.listen(PORT);
+
 
 //******* Get BoldChat API Credentials
 console.log("Reading API variables from config.json file...");
@@ -56,7 +58,7 @@ var EnVars;
 var AID;
 var SETTINGSID;
 var KEY;
-var SLATHRESHOLD;
+var SLATHRESHOLD, INQTHRESHOLD;	// chat in q threshold for double checking (in case trigger missed)
 var MAXCHATCONCURRENCY;
 var GMAILS = [];
 var GOOGLE_CLIENT_ID;
@@ -68,6 +70,7 @@ try
 	SETTINGSID = EnVars.APISETTINGSID || 0;
 	KEY = EnVars.APIKEY || 0;
 	SLATHRESHOLD = EnVars.SLATHRESHOLDS || 90;
+	INQTHRESHOLD = EnVars.INQTHRESHOLD || 300;	 // 5 mins
 	GMAILS = EnVars.USERS || ["tropicalfnv@gmail.com"];
 	GOOGLE_CLIENT_ID = EnVars.GOOGLE_CLIENT_ID || 0;
 	MAXCHATCONCURRENCY = EnVars.MAXCHATCONCURRENCY || 2;
@@ -82,6 +85,7 @@ catch(e)
 		KEY = process.env.APIKEY || 0;
 		GMAILS = process.env.USERS || ["tropicalfnv@gmail.com"];
 		SLATHRESHOLD = process.env.SLATHRESHOLDS || 90;	
+		INQTHRESHOLD = process.env.INQTHRESHOLD || 180;	 
 		MAXCHATCONCURRENCY = process.env.MAXCHATCONCURRENCY || 2;	
 		GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 0;	
 	}
@@ -147,16 +151,23 @@ process.on('uncaughtException', function (err) {
 
 //********************************* Global class exceptions
 var Exception = function() {
-		this.chatAnsweredNotInList = 0;
-		this.chatClosedNotInList = 0;
+		this.chatsStarted = 0;
+		this.chatsAnswered = 0;
+		this.chatsClosed = 0;
+		this.chatsWinClosed = 0;
+		this.opStatusChanged = 0;
 		this.chatsAbandoned = 0;
 		this.chatsBlocked = 0;
 		this.operatorIDUndefined = 0;
 		this.noCsatInfo = 0;
 		this.signatureInvalid = 0;
+		this.chatAnsweredNotInList = 0;
+		this.chatClosedNotInList = 0;
 		this.refreshedAnsweredChat = 0;
-		this.APIDataError = 0;
-		this.jsonDataError = 0;
+		this.longWaitChats = 0;
+		this.longWaitChatUpdate = 0;
+		this.APIJsonError = 0;
+		this.noJsonDataMsg = 0;
 };
 
 //******* Global class for csat data
@@ -252,14 +263,17 @@ var Overall;		// top level stats
 var	OperatorsSetupComplete;
 var	GetOperatorAvailabilitySuccess;
 var Exceptions;
+var LongWaitChats;
 
 function sleep(milliseconds) {
-  var start = new Date().getTime();
-  for(var i = 0; i < 1e7; i++) {
-    if ((new Date().getTime() - start) > milliseconds){
-      break;
-    }
-  }
+	var start = new Date().getTime();
+	for(var i = 0; i < 1e7; i++)
+	{
+		if((new Date().getTime() - start) > milliseconds)
+		{
+			break;
+		}
+	}
 }
 
 function validateSignature(body, triggerUrl) {
@@ -327,9 +341,12 @@ function initialiseGlobals () {
 	ApiDataNotReady = 0;
 	Exceptions = new Exception();
 	GetOperatorAvailabilitySuccess = false;
+	LongWaitChats = new Array();
+
 }
 // Process incoming Boldchat triggered chat data
 app.post('/chat-started', function(req, res){
+	Exceptions.chatsStarted++;
 	if(validateSignature(req.body, TriggerDomain+'/chat-started'))
 	{
 		sendToLogs("Chat-started, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
@@ -341,6 +358,7 @@ app.post('/chat-started', function(req, res){
 
 // Process incoming Boldchat triggered chat data
 app.post('/chat-answered', function(req, res){
+	Exceptions.chatsAnswered++;
 	if(validateSignature(req.body, TriggerDomain+'/chat-answered'))
 	{
 		sendToLogs("Chat-answered, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
@@ -352,6 +370,7 @@ app.post('/chat-answered', function(req, res){
 
 // Process incoming Boldchat triggered chat data
 app.post('/chat-closed', function(req, res){
+	Exceptions.chatsClosed++;
 	if(validateSignature(req.body, TriggerDomain+'/chat-closed'))
 	{
 		sendToLogs("Chat-closed, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
@@ -363,6 +382,7 @@ app.post('/chat-closed', function(req, res){
 
 // Process incoming Boldchat triggered chat data
 app.post('/chat-window-closed', function(req, res){
+	Exceptions.chatsWinClosed++;
 	if(validateSignature(req.body, TriggerDomain+'/chat-window-closed'))
 	{
 		sendToLogs("Chat-window-closed, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
@@ -374,6 +394,7 @@ app.post('/chat-window-closed', function(req, res){
 
 // Process incoming Boldchat triggered operator data
 app.post('/operator-status-changed', function(req, res) { 
+	Exceptions.opStatusChanged++;
 	if(validateSignature(req.body, TriggerDomain+'/operator-status-changed'))
 	{
 		sendToLogs("operator-status-changed, operator id: "+Operators[req.body.LoginID].name);
@@ -710,14 +731,17 @@ function processWindowClosed(chat) {
 	
 	if(chat.ChatStatusType == 7 || chat.ChatStatusType == 8 || (chat.ChatStatusType >= 11 && chat.ChatStatusType <= 15))	// unavailable chat 7, 8, 11, 12, 13, 14 or 15 
 	{
-		Overall.tcun++;
-		deptobj.tcun++;
+		if(chat.Answered == "" || chat.Answered == null)	// only count as unavail if not answered
+		{
+			Overall.tcun++;
+			deptobj.tcun++;
+		}
 	}	
 	else if(typeof(AllChats[chat.ChatID]) !== 'undefined')
 	{
 		if(AllChats[chat.ChatID].answered == 0 && AllChats[chat.ChatID].started != 0)		// chat started but unanswered
 		{
-			if(chat.OperatorID == 0 || chat.OperatorID == null)	// operator unassigned
+			if(chat.OperatorID == "" || chat.OperatorID == null)	// operator unassigned
 			{
 				Overall.tcuq++;
 				deptobj.tcuq++;
@@ -1019,6 +1043,7 @@ function calculateLWT_CIQ() {
 	}
 	
 	// now recalculate the lwt by dept and save the overall
+	LongWaitChats = [];		// clear the array for refresh timer processing
 	for(var i in AllChats)
 	{
 		tchat = AllChats[i];
@@ -1027,6 +1052,9 @@ function calculateLWT_CIQ() {
 			Overall.ciq++;
 			Departments[tchat.departmentID].ciq++;
 			waittime = Math.round((TimeNow - tchat.started)/1000);
+			if(waittime > INQTHRESHOLD)		// if this chat has been waiting a long time
+				LongWaitChats.push(tchat.chatID);
+				
 			if(Departments[tchat.departmentID].lwt < waittime)
 			{
 				Departments[tchat.departmentID].lwt = waittime;
@@ -1131,7 +1159,7 @@ function getApiData(method,params,fcallback,cbparam) {
 		} 
 		catch (e) 
 		{
-			Exceptions.APIDataError++;
+			Exceptions.APIJsonError++;
 			emsg = TimeNow+ ": API did not return JSON message: "+str;
 			console.log(emsg);
 			sendToLogs(emsg);
@@ -1141,7 +1169,7 @@ function getApiData(method,params,fcallback,cbparam) {
 		data = jsonObj.Data;
 		if(data === 'undefined' || data == null)
 		{
-			Exceptions.jsonDataError++;
+			Exceptions.noJsonDataMsg++;
 			emsg = TimeNow+ ":"+method+": No data: "+str;
 			console.log(emsg);
 			sendToLogs(emsg);
@@ -1225,7 +1253,7 @@ function getActiveChatData() {
 	}
 }
 
-// setup dept and skills by operator for easy indexing
+// setup dept and skills by operator for easy indexing. Used during start up only
 function setUpDeptAndSkillGroups() {
 	if(ApiDataNotReady)
 	{
@@ -1270,7 +1298,7 @@ function allActiveChats(chats) {
 	}
 }
 
-// process all active chat objects 
+// process all active chat objects. This is done every minute in case triggers are missed
 function refreshActiveChatsTimer() {
 	if(!OperatorsSetupComplete)
 		return;
@@ -1279,12 +1307,11 @@ function refreshActiveChatsTimer() {
 	{
 		parameters = "DepartmentID="+did;
 		getApiData("getActiveChats",parameters,refreshActiveChats);
-		ApiDataNotReady--;	// do not count this API request
-		sleep(1000);
+		sleep(500);
 	}
 }
 
-// refresh all active chat objects. This isdone every minute in case triggers are missed
+// refresh all active chat objects. 
 function refreshActiveChats(chats) {
 	for(var i in chats)
 	{
@@ -1300,6 +1327,46 @@ function refreshActiveChats(chats) {
 			}
 		}
 	}
+}
+
+// If chats have been waiting to be answered a long time then trigger may be missed so
+// get individual chat info. This is done every minute in case triggers are missed
+function longWaitChatsTimer() {
+	for(var i in LongWaitChats)	// for each chat
+	{
+		parameters = "ChatID="+LongWaitChats[i];
+		getApiData("getChat",parameters,updateLongWaitChat);
+		Exceptions.longWaitChats++;
+		sleep(500);
+	}
+}
+
+// Process the long wait chat in case triggers were missed 
+function updateLongWaitChat(chat) {
+	
+	if(typeof(AllChats[chat.ChatID]) !== 'undefined')
+	{
+		if(chat.Answered !== "" && chat.Answered !== null)
+		{
+			if(AllChats[chat.ChatID].status == 1)	// if chat was waiting to be answered
+			{
+				processAnsweredChat(chat);
+				Exceptions.longWaitChatUpdate++;
+				if(chat.Closed !== "" && chat.Closed !== null)
+				{
+					processClosedChat(chat);
+				}
+			}
+		}		
+		else if(chat.WindowClosed !== "" && chat.WindowClosed !== null)
+		{			
+			if(AllChats[chat.ChatID].status == 1)	// if chat was waiting to be answered now closed means unanswered
+			{
+				processWindowClosed(chat);
+				Exceptions.longWaitChatUpdate++;
+			}
+		}
+	} // if not answered or closed then this chat must still be in the queue so ignore
 }
 
 // process all inactive (closed) chat objects
@@ -1506,7 +1573,7 @@ function updateChatStats() {
 		io.to(socketid).emit('consoleLogs',str);
 		io.to(socketid).emit('exceptions',Exceptions);
 	}
-//	setTimeout(updateChatStats, 2000);	// send update every 2 second
+
 }
 
 // setup all globals
@@ -1537,5 +1604,6 @@ function checkOperatorAvailability() {
 console.log("Server started on port "+PORT);
 doStartOfDay();		// initialise everything
 setInterval(updateChatStats,3000);	// updates socket io data at infinitum
-setInterval(refreshActiveChatsTimer, 60000);	
+//setInterval(refreshActiveChatsTimer, 60000);	
+setInterval(longWaitChatsTimer, 60000);
 
