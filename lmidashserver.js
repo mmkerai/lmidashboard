@@ -919,13 +919,11 @@ function removeActiveChat(opobj, chatid) {
 }
 // calculate ACT and Chat per hour - both are done after chats are complete (closed)
 function calculateACT_CPH() {
-	var tchat, sgid;
+	var tchat;
 	var count=0,ochattime=0,cph=0;
 	var dchattime = new Object();
 	var dcount = new Object();
 	var dcph = new Object();
-	var sgchattime = new Object();	// skill group
-	var sgcount = new Object();
 	var pastHour = TimeNow - (60*60*1000);	// Epoch time for past hour
 
 	for(var i in Departments)
@@ -934,8 +932,6 @@ function calculateACT_CPH() {
 		dcount[i] = 0;
 		dchattime[i] = 0;
 		dcph[i] = 0;
-		sgcount[Departments[i].skillgroup] = 0;
-		sgchattime[Departments[i].skillgroup] = 0;
 	}
 	
 	for(var i in Operators)
@@ -951,14 +947,11 @@ function calculateACT_CPH() {
 			count++;
 			if(tchat.departmentID == 0 || tchat.skillgroup == 0)	// shouldnt be
 				continue;
-			sgid = Departments[tchat.departmentID].skillgroup;
 			dcount[tchat.departmentID]++;
-			sgcount[sgid]++; 
 			ctime = tchat.ended - tchat.answered;
 			if(isNaN(ctime)) continue;
 			ochattime = ochattime + ctime;
 			dchattime[tchat.departmentID] = dchattime[tchat.departmentID] + ctime;	
-			sgchattime[sgid] = sgchattime[sgid] + ctime;	
 			if(tchat.ended >= pastHour)
 			{
 				cph++;
@@ -1007,17 +1000,14 @@ function calculateASA_SLA() {
 				continue;
 				
 			dcount[tchat.departmentID]++;
-			sgcount[tchat.skillgroup]++;
 			speed = tchat.answered - tchat.started;
 			if(isNaN(speed)) continue;
 			anstime = anstime + speed;
 			danstime[tchat.departmentID] = danstime[tchat.departmentID] + speed;
-			sganstime[tchat.skillgroup] = sganstime[tchat.skillgroup] + speed;
 			if(tchat.status == 2)	// active chat
 			{
 				tac++;
 				dtac[tchat.departmentID]++;
-				sgtac[tchat.skillgroup]++;
 			}
 		}
 	}
@@ -1073,7 +1063,7 @@ function calculateLWT_CIQ() {
 //use operators by dept to calc chat concurrency and available chat capacity and total chats offered
 function calculateACC_CCONC_TCO() {
 	var depts = new Array();
-	var opobj, sgid;
+	var opobj;
 
 	// first zero out the cconc and acc for all dept
 	Overall.cconc = 0;
@@ -1108,7 +1098,6 @@ function calculateACC_CCONC_TCO() {
 		
 		Overall.tct = Overall.tct + opobj.tct;
 		Overall.mct = Overall.mct + opobj.mct;
-		sgid = OperatorSkills[i];
 		if(opobj.status == 2)		// make sure operator is available
 		{
 			opobj.acc = opobj.maxcc - opobj.activeChats.length;
