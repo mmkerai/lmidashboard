@@ -846,8 +846,11 @@ function processOperatorStatusChanged(ostatus) {
 	}
 	return true;
 }
-
+// This is called after chat is closed to save concurrency time
 function updateCconc(tchat) {
+	if(tchat.answered == 0)	// if not answered chat then ignore
+		return;
+	
 	var sh,sm,eh,em,sindex,eindex;
 	var conc = new Array();
 	conc = OperatorCconc[tchat.operatorID];		// chat concurrency array
