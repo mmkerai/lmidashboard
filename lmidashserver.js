@@ -153,6 +153,7 @@ process.on('uncaughtException', function (err) {
 var Exception = function() {
 		this.chatsStarted = 0;
 		this.chatsAnswered = 0;
+		this.chatReassigned = 0;
 		this.chatsClosed = 0;
 		this.chatsWinClosed = 0;
 		this.opStatusChanged = 0;
@@ -368,6 +369,18 @@ app.post('/chat-answered', function(req, res){
 	res.send({ "result": "success" });
 });
 
+// Process incoming Boldchat triggered chat re-assigned message
+app.post('/chat-reassigned', function(req, res) { 
+	Exceptions.chatReassigned++;
+	if(validateSignature(req.body, TriggerDomain+'/chat-reassigned'))
+	{
+		sendToLogs("chat-reassigned, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
+		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
+			processReassignedChat(req.body);
+	}
+	res.send({ "result": "success" });
+});
+
 // Process incoming Boldchat triggered chat data
 app.post('/chat-closed', function(req, res){
 	Exceptions.chatsClosed++;
@@ -400,18 +413,6 @@ app.post('/operator-status-changed', function(req, res) {
 		sendToLogs("operator-status-changed, operator: "+Operators[req.body.LoginID].name);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
 			processOperatorStatusChanged(req.body);
-	}
-	res.send({ "result": "success" });
-});
-
-// Process incoming Boldchat triggered chat re-assigned message
-app.post('/chat-reassigned', function(req, res) { 
-	Exceptions.chatReassigned++;
-	if(validateSignature(req.body, TriggerDomain+'/chat-reassigned'))
-	{
-		sendToLogs("chat-reassigned, operator: "+Operators[req.body.LoginID].name);
-		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
-			processReassignedChat(req.body);
 	}
 	res.send({ "result": "success" });
 });
