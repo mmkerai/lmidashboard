@@ -698,8 +698,8 @@ function processReassignedChat(chat) {
 			processAnsweredChat(chat);
 		}
 	}
-	console.log("Previous Operator: "+Operators[chat.LastAssignedByOperatorID].name));
-	console.log("New Operator: "+Operators[chat.LoginID].name));
+	console.log("Previous Operator: "+Operators[chat.LastAssignedByOperatorID].name);
+	console.log("New Operator: "+Operators[chat.LoginID].name);
 	
 }
 
