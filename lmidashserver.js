@@ -686,12 +686,13 @@ function processAnsweredChat(chat) {
 
 // process re-assigned chat object
 function processReassignedChat(chat) {
-	var deptobj,opobj,tchat;
 
-	deptobj = Departments[chat.DepartmentID];
+	var deptobj = Departments[chat.DepartmentID];
 	if(typeof(deptobj) === 'undefined') return false;		// a dept we are not interested in
 
-	if(typeof((tchat=AllChats[chat.ChatID])) === 'undefined')	// this only happens if triggers are missed
+	var tchat = AllChats[chat.ChatID];
+	
+	if(typeof(tchat) === 'undefined')	// this only happens if triggers are missed
 	{
 		processStartedChat(chat);
 		if(chat.Answered !== "" && chat.Answered !== null)
@@ -700,7 +701,7 @@ function processReassignedChat(chat) {
 		}
 	}
 	
-	opobj = Operators[chat.OperatorID];
+	var opobj = Operators[chat.OperatorID];
 	if(typeof(opobj) === 'undefined') return false;		// an operator that doesnt exist (may happen if created midday)
 
 	console.log("Previous Operator: "+Operators[tchat.operatorID].name);

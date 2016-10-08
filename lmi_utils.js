@@ -4,7 +4,7 @@ var ChatStatus = ["Logged Out","Away","Available"];
 var GOOGLE_CLIENT_ID="817020760023-41aoervnm8ntf76poubf8nq57lp9ek7f.apps.googleusercontent.com";
 var csvfile = null;
 var googleUser;
-var RTAVersion = "Dashboard v1.09";
+var RTAVersion = "Dashboard v1.2";
 
 function readCookie(name)
 {
