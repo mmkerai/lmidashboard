@@ -397,9 +397,21 @@ app.post('/operator-status-changed', function(req, res) {
 	Exceptions.opStatusChanged++;
 	if(validateSignature(req.body, TriggerDomain+'/operator-status-changed'))
 	{
-		sendToLogs("operator-status-changed, operator id: "+Operators[req.body.LoginID].name);
+		sendToLogs("operator-status-changed, operator: "+Operators[req.body.LoginID].name);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
 			processOperatorStatusChanged(req.body);
+	}
+	res.send({ "result": "success" });
+});
+
+// Process incoming Boldchat triggered chat re-assigned message
+app.post('/chat-reassigned', function(req, res) { 
+	Exceptions.chatReassigned++;
+	if(validateSignature(req.body, TriggerDomain+'/chat-reassigned'))
+	{
+		sendToLogs("chat-reassigned, operator: "+Operators[req.body.LoginID].name);
+		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
+			processReassignedChat(req.body);
 	}
 	res.send({ "result": "success" });
 });
@@ -671,6 +683,26 @@ function processAnsweredChat(chat) {
 	return true;
 }
 
+// process re-assigned chat object
+function processReassignedChat(chat) {
+	var deptobj,opobj;
+
+	deptobj = Departments[chat.DepartmentID];
+	if(typeof(deptobj) === 'undefined') return false;		// a dept we are not interested in
+
+	if(typeof(AllChats[chat.ChatID]) === 'undefined')	// this only happens if triggers are missed
+	{
+		processStartedChat(chat);
+		if(chat.Answered !== "" && chat.Answered !== null)
+		{
+			processAnsweredChat(chat);
+		}
+	}
+	console.log("Previous Operator: "+Operators[chat.LastAssignedByOperatorID].name));
+	console.log("New Operator: "+Operators[chat.LoginID].name));
+	
+}
+
 // process closed chat object. closed chat is one that is started and answered.
 // Otherwise go to processwindowclosed
 function processClosedChat(chat) {
@@ -693,21 +725,20 @@ function processClosedChat(chat) {
 	AllChats[chat.ChatID].ended = new Date(chat.Ended);
 	AllChats[chat.ChatID].closed = new Date(chat.Closed);
 
-	if(chat.OperatorID != "" && chat.OperatorID != null)
-	{
-		opobj = Operators[chat.OperatorID];
-		if(typeof(opobj) === 'undefined') return false;	// shouldnt happen
-		// add the total chat time for this chat
-		var chattime = Math.round((AllChats[chat.ChatID].closed - AllChats[chat.ChatID].started)/1000);
-		opobj.tcta = opobj.tcta + chattime;
-		// now remove from active chat list and update stats
-		removeActiveChat(opobj, chat.ChatID);	
-		opobj.tcc = opobj.tcan - opobj.activeChats.length;	// answered chat less active
-		if(opobj.tcc > 0)
-			opobj.act = Math.round(opobj.tcta/opobj.tcc);
+	opobj = Operators[AllChats[chat.ChatID].operatorID];
+	if(typeof(opobj) === 'undefined') return false;	// shouldnt happen
 
-		updateCconc(AllChats[chat.ChatID]);	// update chat conc now that it is closed
-	}
+	// add the total chat time for this chat
+	var chattime = Math.round((AllChats[chat.ChatID].closed - AllChats[chat.ChatID].started)/1000);
+	opobj.tcta = opobj.tcta + chattime;
+	// now remove from active chat list and update stats
+	removeActiveChat(opobj, chat.ChatID);	
+	opobj.tcc = opobj.tcan - opobj.activeChats.length;	// answered chat less active
+	if(opobj.tcc > 0)
+		opobj.act = Math.round(opobj.tcta/opobj.tcc);
+
+	updateCconc(AllChats[chat.ChatID]);	// update chat conc now that it is closed
+
 	return true;
 }
 

@@ -1,16 +1,14 @@
+var socket = io('', {
+	'reconnection': true,
+    'reconnectionDelay': 1000,
+    'reconnectionAttempts': 50
+});
 
 function downloadChats()
 {
 	var data = new Object();
 	$("#message").text("Creating csv file");
 	socket.emit('downloadChats', data);
-}
-
-function downloadChatTransfers()
-{
-	var data = new Object();
-	$("#message").text("Creating csv file");
-	socket.emit('downloadChatTransfers', data);
 }
 
 $(document).ready(function() {
@@ -66,27 +64,19 @@ $(document).ready(function() {
 		
 		$("#result").text("Download csv file");
 		var filedata = new Blob([data],{type: 'text/plain'});
+		// If we are replacing a previously generated file we need to
+		// manually revoke the object URL to avoid memory leaks.
 		if (csvfile !== null)
 		{
 			window.URL.revokeObjectURL(csvfile);
 		}
 		csvfile = window.URL.createObjectURL(filedata);
-		$('#todayschats').attr('href', csvfile);
-		$('#todayschats').html("Download file");
+		$('#link2').attr('href', csvfile);
+		$('#link2').html("Download file");
 	});
 
-	socket.on('chatTransferResponse', function(data){
-		var csvfile;
-		
-		$("#result").text("Download csv file");
-		var filedata = new Blob([data],{type: 'text/plain'});
-		if (csvfile !== null)
-		{
-			window.URL.revokeObjectURL(csvfile);
-		}
-		csvfile = window.URL.createObjectURL(filedata);
-		$('#chattransfers').attr('href', csvfile);
-		$('#chattransfers').html("Download file");
-	});
+});
 
+$(window).on('beforeunload',function () {
+	socket.close();
 });
