@@ -686,12 +686,12 @@ function processAnsweredChat(chat) {
 
 // process re-assigned chat object
 function processReassignedChat(chat) {
-	var deptobj,opobj;
+	var deptobj,opobj,tchat;
 
 	deptobj = Departments[chat.DepartmentID];
 	if(typeof(deptobj) === 'undefined') return false;		// a dept we are not interested in
 
-	if(typeof(AllChats[chat.ChatID]) === 'undefined')	// this only happens if triggers are missed
+	if(typeof((tchat=AllChats[chat.ChatID])) === 'undefined')	// this only happens if triggers are missed
 	{
 		processStartedChat(chat);
 		if(chat.Answered !== "" && chat.Answered !== null)
@@ -699,9 +699,17 @@ function processReassignedChat(chat) {
 			processAnsweredChat(chat);
 		}
 	}
-	console.log("Previous Operator: "+Operators[chat.LastAssignedByOperatorID].name);
-	console.log("New Operator: "+Operators[chat.LoginID].name);
 	
+	opobj = Operators[chat.OperatorID];
+	if(typeof(opobj) === 'undefined') return false;		// an operator that doesnt exist (may happen if created midday)
+
+	console.log("Previous Operator: "+Operators[tchat.operatorID].name);
+	console.log("New Operator: "+opobj.name);
+	removeActiveChat(Operators[tchat.operatorID], chat.ChatID); // remove from previous op
+	Operators[tchat.operatorID].tcan--;		// remove chat answereed credit from this operator
+	tchat.operatorID = chat.OperatorID;		// assign new operator to this chat
+	opobj.tcan++;							// and give him credit
+	opobj.activeChats.push(chat.ChatID);	// credit the new operator
 }
 
 // process closed chat object. closed chat is one that is started and answered.
