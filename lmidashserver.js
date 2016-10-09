@@ -309,7 +309,8 @@ function getUnencryptedSignature(body, triggerUrl) {
 
 	var separator = triggerUrl.indexOf('?') === -1 ? '?' : '&';
 	var unc = triggerUrl + separator + paramNameValues.join('&');
-	return unc.replace(/%20/g,'+');
+	var adj = unc.replace(/%20/g,'+');		// %20 to a + (old style)
+	return adj.replace(/\'/g,'%27');	// ' should be encoded (old style)
 }
 
 function encryptSignature(unencryptedSignature) {
@@ -348,73 +349,73 @@ function initialiseGlobals () {
 // Process incoming Boldchat triggered chat data
 app.post('/chat-started', function(req, res){
 	Exceptions.chatsStarted++;
+	res.send({ "result": "success" });
 	if(validateSignature(req.body, TriggerDomain+'/chat-started'))
 	{
 		sendToLogs("Chat-started, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
 			processStartedChat(req.body);
 	}
-	res.send({ "result": "success" });
 });
 
 // Process incoming Boldchat triggered chat data
 app.post('/chat-answered', function(req, res){
 	Exceptions.chatsAnswered++;
+	res.send({ "result": "success" });
 	if(validateSignature(req.body, TriggerDomain+'/chat-answered'))
 	{
 		sendToLogs("Chat-answered, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
 			processAnsweredChat(req.body);
 	}
-	res.send({ "result": "success" });
 });
 
 // Process incoming Boldchat triggered chat re-assigned message
 app.post('/chat-reassigned', function(req, res) { 
 	Exceptions.chatReassigned++;
+	res.send({ "result": "success" });
 	if(validateSignature(req.body, TriggerDomain+'/chat-reassigned'))
 	{
 		sendToLogs("chat-reassigned, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
 			processReassignedChat(req.body);
 	}
-	res.send({ "result": "success" });
 });
 
 // Process incoming Boldchat triggered chat data
 app.post('/chat-closed', function(req, res){
 	Exceptions.chatsClosed++;
+	res.send({ "result": "success" });
 	if(validateSignature(req.body, TriggerDomain+'/chat-closed'))
 	{
 		sendToLogs("Chat-closed, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
 			processClosedChat(req.body);
 	}
-	res.send({ "result": "success" });
 });
 
 // Process incoming Boldchat triggered chat data
 app.post('/chat-window-closed', function(req, res){
 	Exceptions.chatsWinClosed++;
+	res.send({ "result": "success" });
 	if(validateSignature(req.body, TriggerDomain+'/chat-window-closed'))
 	{
 		sendToLogs("Chat-window-closed, chat id: "+req.body.ChatID+",ChatStatusType is "+req.body.ChatStatusType);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
 			processWindowClosed(req.body);
 	}
-	res.send({ "result": "success" });
 });
 
 // Process incoming Boldchat triggered operator data
 app.post('/operator-status-changed', function(req, res) { 
 	Exceptions.opStatusChanged++;
+	res.send({ "result": "success" });
 	if(validateSignature(req.body, TriggerDomain+'/operator-status-changed'))
 	{
 		sendToLogs("operator-status-changed, operator: "+Operators[req.body.LoginID].name);
 		if(OperatorsSetupComplete)		//make sure all static data has been obtained first
 			processOperatorStatusChanged(req.body);
 	}
-	res.send({ "result": "success" });
 });
 
 // Set up code for outbound BoldChat API calls.  All of the capture callback code should ideally be packaged as an object.
@@ -1080,7 +1081,6 @@ function calculateLWT_CIQ() {
 	}
 	
 	// now recalculate the lwt by dept and save the overall
-	LongWaitChats = [];		// clear the array for refresh timer processing
 	for(var i in AllChats)
 	{
 		tchat = AllChats[i];
@@ -1090,7 +1090,10 @@ function calculateLWT_CIQ() {
 			Departments[tchat.departmentID].ciq++;
 			waittime = Math.round((TimeNow - tchat.started)/1000);
 			if(waittime > INQTHRESHOLD)		// if this chat has been waiting a long time
-				LongWaitChats.push(tchat.chatID);
+			{
+				if(!LongWaitChats.includes(tchat.chatID))	// add to list if not already in
+					LongWaitChats.push(tchat.chatID);
+			}
 				
 			if(Departments[tchat.departmentID].lwt < waittime)
 			{
@@ -1368,12 +1371,11 @@ function refreshActiveChats(chats) {
 // If chats have been waiting to be answered a long time then trigger may be missed so
 // get individual chat info. This is done every minute in case triggers are missed
 function longWaitChatsTimer() {
-	for(var i in LongWaitChats)	// for each chat
+	if(LongWaitChats.length > 0)	// check not empty
 	{
-		parameters = "ChatID="+LongWaitChats[i];
+		parameters = "ChatID="+LongWaitChats.shift();	// get from FIFO
 		getApiData("getChat",parameters,updateLongWaitChat);
 		Exceptions.longWaitChats++;
-		sleep(500);
 	}
 }
 
@@ -1641,5 +1643,5 @@ console.log("Server started on port "+PORT);
 doStartOfDay();		// initialise everything
 setInterval(updateChatStats,3000);	// updates socket io data at infinitum
 //setInterval(refreshActiveChatsTimer, 60000);	
-setInterval(longWaitChatsTimer, 60000);
+setInterval(longWaitChatsTimer, 20000);
 
