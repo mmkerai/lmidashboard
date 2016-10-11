@@ -85,7 +85,7 @@ catch(e)
 		KEY = process.env.APIKEY || 0;
 		GMAILS = process.env.USERS || ["tropicalfnv@gmail.com"];
 		SLATHRESHOLD = process.env.SLATHRESHOLDS || 90;	
-		INQTHRESHOLD = process.env.INQTHRESHOLD || 180;	 
+		INQTHRESHOLD = process.env.INQTHRESHOLD || 300;	 
 		MAXCHATCONCURRENCY = process.env.MAXCHATCONCURRENCY || 2;	
 		GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 0;	
 	}
@@ -990,17 +990,17 @@ function calculateACT_CPH() {
 	for(var i in AllChats)
 	{
 		tchat = AllChats[i];
-		if(tchat.status == 0 && tchat.ended != 0 && tchat.answered != 0)		// chat ended
+		if(tchat.status == 0 && tchat.closed != 0 && tchat.answered != 0)		// chat ended
 		{
 			count++;
 			if(tchat.departmentID == 0 || tchat.skillgroup == 0)	// shouldnt be
 				continue;
 			dcount[tchat.departmentID]++;
-			ctime = tchat.ended - tchat.answered;
+			ctime = tchat.closed - tchat.answered;
 			if(isNaN(ctime)) continue;
 			ochattime = ochattime + ctime;
 			dchattime[tchat.departmentID] = dchattime[tchat.departmentID] + ctime;	
-			if(tchat.ended >= pastHour)
+			if(tchat.closed >= pastHour)
 			{
 				cph++;
 				dcph[tchat.departmentID]++;
@@ -1257,7 +1257,10 @@ function calculateOperatorConc() {
 		for(var i in conc)
 		{
 			if(conc[i] > 0) chattime++;		// all chats
-			if(conc[i] > 1) mchattime++;	// multichats
+			for(var j=1;conc[i] > j;j++)	// multichats
+			{
+				mchattime++;	// multichats
+			}
 		}
 		opobj.tct = chattime*60;			// minutes to seconds
 		opobj.mct = mchattime*60;		// minutes to seconds
@@ -1289,7 +1292,7 @@ function getActiveChatData() {
 	{
 		parameters = "DepartmentID="+did;
 		getApiData("getActiveChats",parameters,allActiveChats);
-		sleep(100);
+		sleep(500);
 	}
 }
 
@@ -1463,7 +1466,7 @@ function getInactiveChatData() {
 	{
 		parameters = "FolderID="+fid+"&FromDate="+StartOfDay.toISOString();
 		getApiData("getInactiveChats", parameters, allInactiveChats);
-		sleep(200);
+		sleep(300);
 	}	
 }
 
